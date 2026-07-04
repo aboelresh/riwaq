@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Assessment\SubmitAssessmentRequest;
 use App\Services\AssessmentService;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Http\JsonResponse;
 
 class AssessmentController extends Controller
 {
@@ -13,79 +13,53 @@ class AssessmentController extends Controller
         private AssessmentService $assessmentService
     ) {}
 
-    /**
-     * Get assessment questions
-     */
-    public function getQuestions()
+    public function getQuestions(): JsonResponse
     {
         $questions = $this->assessmentService->getAssessmentQuestions();
 
         return response()->json([
             'success' => true,
-            'data' => [
-                'questions' => $questions,
+            'data'    => [
+                'questions'       => $questions,
                 'total_questions' => count($questions),
-            ]
+            ],
         ]);
     }
 
-    /**
-     * Submit assessment answers
-     */
-    public function submit(Request $request)
+    public function submit(SubmitAssessmentRequest $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'answers' => 'required|array',
-            'answers.*' => 'required|string|in:A,B,C,D',
+        $user   = auth()->user();
+        $result = $this->assessmentService->evaluateAssessment(
+            $user,
+            $request->validated('answers')
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Assessment completed successfully!',
+            'data'    => [
+                'recommended_track' => $result->recommendedTrack,
+                'scores'            => $result->scores,
+                'analysis'          => $result->analysis,
+            ],
         ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        $user = auth()->user();
-
-        try {
-            $result = $this->assessmentService->evaluateAssessment($user, $request->answers);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Assessment completed successfully!',
-                'data' => [
-                    'recommended_track' => $result->recommendedTrack,
-                    'scores' => $result->scores,
-                    'analysis' => $result->analysis,
-                ]
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to process assessment: ' . $e->getMessage()
-            ], 500);
-        }
     }
 
-    /**
-     * Get user's assessment result
-     */
-    public function getMyResult()
+    public function getMyResult(): JsonResponse
     {
-        $user = auth()->user();
+        $user   = auth()->user();
         $result = $this->assessmentService->getUserAssessment($user);
 
         if (!$result) {
             return response()->json([
                 'success' => false,
-                'message' => 'No assessment found'
+                'message' => 'No assessment found.',
             ], 404);
         }
 
         return response()->json([
             'success' => true,
-            'data' => $result
+            'data'    => $result,
         ]);
     }
 }
