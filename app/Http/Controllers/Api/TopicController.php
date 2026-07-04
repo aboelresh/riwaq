@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Topic\UpdateVideoProgressRequest;
+use App\Http\Resources\TopicResource;
 use App\Models\Topic;
 use App\Models\UserTopicProgress;
 use App\Services\ProgressService;
-use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 
 class TopicController extends Controller
 {
@@ -14,38 +16,35 @@ class TopicController extends Controller
         private ProgressService $progressService
     ) {}
 
-    public function show($id)
+    public function show($id): JsonResponse
     {
-        $user = auth()->user();
+        $user  = auth()->user();
         $topic = Topic::findOrFail($id);
 
-        // Policy check only (handles unlock logic internally)
         if (!$user->can('view', $topic)) {
             return response()->json([
                 'success' => false,
-                'message' => 'This topic is locked.'
+                'message' => 'This topic is locked.',
             ], 403);
         }
 
-        // Load quiz relationship
         $topic->load('quiz');
 
         return response()->json([
             'success' => true,
-            'data' => $topic
+            'data'    => new TopicResource($topic),
         ]);
     }
 
-    public function markAsViewed($id)
+    public function markAsViewed($id): JsonResponse
     {
-        $user = auth()->user();
+        $user  = auth()->user();
         $topic = Topic::findOrFail($id);
 
-        // Policy check
         if (!$user->can('markAsViewed', $topic)) {
             return response()->json([
                 'success' => false,
-                'message' => 'This topic is locked.'
+                'message' => 'This topic is locked.',
             ], 403);
         }
 
@@ -53,28 +52,23 @@ class TopicController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Topic marked as viewed'
+            'message' => 'Topic marked as viewed',
         ]);
     }
 
-    /**
-     * POST /topics/{id}/video-progress
-     * Save video watch progress (position, watched seconds)
-     */
-    public function updateVideoProgress(Request $request, $id)
+    public function updateVideoProgress(UpdateVideoProgressRequest $request, $id): JsonResponse
     {
-        $user = auth()->user();
+        $user  = auth()->user();
         $topic = Topic::findOrFail($id);
 
         if ($topic->type !== 'video') {
-            return response()->json(['success' => false, 'message' => 'Not a video topic'], 400);
+            return response()->json([
+                'success' => false,
+                'message' => 'This topic is not a video.',
+            ], 400);
         }
 
-        $validated = $request->validate([
-            'current_time' => 'required|numeric|min:0',
-            'duration' => 'required|numeric|min:1',
-            'watched_seconds' => 'required|integer|min:0',
-        ]);
+        $data = $request->validated();
 
         $progress = UserTopicProgress::firstOrCreate(
             ['user_id' => $user->id, 'topic_id' => $id],
@@ -82,44 +76,44 @@ class TopicController extends Controller
         );
 
         $progress->update([
-            'video_last_position' => (int) $validated['current_time'],
-            'video_total_seconds' => (int) $validated['duration'],
-            'video_watched_seconds' => max($progress->video_watched_seconds, (int) $validated['watched_seconds']),
+            'video_last_position'   => (int) $data['current_time'],
+            'video_total_seconds'   => (int) $data['duration'],
+            'video_watched_seconds' => max($progress->video_watched_seconds, (int) $data['watched_seconds']),
         ]);
 
-        // Auto-mark as viewed if watched 80%+
-        $watchedPct = $validated['duration'] > 0 ? ($validated['watched_seconds'] / $validated['duration']) * 100 : 0;
+        $watchedPct = $data['duration'] > 0
+            ? ($data['watched_seconds'] / $data['duration']) * 100
+            : 0;
+
         if ($watchedPct >= 80 && !$progress->is_viewed) {
             $this->progressService->markTopicAsViewed($user, $topic);
         }
 
         return response()->json([
             'success' => true,
-            'data' => [
+            'data'    => [
                 'watched_percent' => round($watchedPct),
-                'last_position' => (int) $validated['current_time'],
-                'is_completed' => $watchedPct >= 80,
-            ]
+                'last_position'   => (int) $data['current_time'],
+                'is_completed'    => $watchedPct >= 80,
+            ],
         ]);
     }
 
-    /**
-     * GET /topics/{id}/video-progress
-     * Get saved video progress for resume
-     */
-    public function getVideoProgress($id)
+    public function getVideoProgress($id): JsonResponse
     {
-        $user = auth()->user();
-        $progress = UserTopicProgress::where('user_id', $user->id)->where('topic_id', $id)->first();
+        $user     = auth()->user();
+        $progress = UserTopicProgress::where('user_id', $user->id)
+            ->where('topic_id', $id)
+            ->first();
 
         return response()->json([
             'success' => true,
-            'data' => [
-                'last_position' => $progress?->video_last_position ?? 0,
+            'data'    => [
+                'last_position'   => $progress?->video_last_position ?? 0,
                 'watched_seconds' => $progress?->video_watched_seconds ?? 0,
-                'total_seconds' => $progress?->video_total_seconds ?? 0,
-                'is_viewed' => $progress?->is_viewed ?? false,
-            ]
+                'total_seconds'   => $progress?->video_total_seconds ?? 0,
+                'is_viewed'       => $progress?->is_viewed ?? false,
+            ],
         ]);
     }
 }
