@@ -3,32 +3,36 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Track;
 use App\Models\Course;
-use App\Models\Topic;
 use App\Models\Team;
+use App\Models\Topic;
+use App\Models\Track;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class SearchController extends Controller
 {
-    public function search(Request $request)
+    public function search(Request $request): JsonResponse
     {
         $q = $request->query('q', '');
 
         if (strlen($q) < 2) {
             return response()->json([
                 'success' => true,
-                'data' => ['tracks' => [], 'courses' => [], 'topics' => [], 'teams' => []],
+                'data'    => ['tracks' => [], 'courses' => [], 'topics' => [], 'teams' => []],
             ]);
         }
 
+        // Fix: select only columns that actually exist in each table
+        // tracks:  no 'icon' column (not in migration)
+        // courses: no 'track_id' column (relationship is via track_courses pivot)
         $tracks = Track::where('title', 'like', "%{$q}%")
-            ->select('id', 'title', 'description', 'icon')
+            ->select('id', 'title', 'description')
             ->limit(5)
             ->get();
 
         $courses = Course::where('title', 'like', "%{$q}%")
-            ->select('id', 'title', 'track_id')
+            ->select('id', 'title', 'description')
             ->limit(5)
             ->get();
 
@@ -44,7 +48,7 @@ class SearchController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => compact('tracks', 'courses', 'topics', 'teams'),
+            'data'    => compact('tracks', 'courses', 'topics', 'teams'),
         ]);
     }
 }
