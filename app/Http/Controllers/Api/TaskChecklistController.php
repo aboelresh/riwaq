@@ -3,144 +3,112 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Team;
-use App\Models\TeamTask;
 use App\Models\TaskChecklistItem;
-use App\Models\TeamMember;
+use App\Models\TeamTask;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
 
 class TaskChecklistController extends Controller
 {
-    /**
-     * GET /teams/{teamId}/tasks/{taskId}/checklist
-     */
-    public function index($teamId, $taskId)
+    public function index($teamId, $taskId): JsonResponse
     {
-        $this->ensureMember($teamId);
-        $task = TeamTask::where('team_id', $teamId)->findOrFail($taskId);
+        TeamTask::where('team_id', $teamId)->findOrFail($taskId);
 
-        $items = $task->checklist()->with('completedByUser:id,name,profile_photo')->get();
-        $progress = $task->checklistProgress();
+        $items = TaskChecklistItem::where('task_id', $taskId)
+            ->with('completedBy')
+            ->orderBy('created_at')
+            ->get();
 
-        return response()->json(['success' => true, 'data' => ['items' => $items, 'progress' => $progress]]);
+        return response()->json(['success' => true, 'data' => $items]);
     }
 
-    /**
-     * POST /teams/{teamId}/tasks/{taskId}/checklist
-     * Body: { content } or { items: ["item1", "item2"] } for bulk
-     */
-    public function store(Request $request, $teamId, $taskId)
+    public function store(Request $request, $teamId, $taskId): JsonResponse
     {
-        $team = Team::findOrFail($teamId);
-        $user = auth()->user();
-        $task = TeamTask::where('team_id', $teamId)->findOrFail($taskId);
+        TeamTask::where('team_id', $teamId)->findOrFail($taskId);
 
-        // Leader or assignee can add checklist items
-        $isLeader = $team->created_by === $user->id || $user->role === 'admin';
-        $isAssignee = $task->assignees()->where('users.id', $user->id)->exists();
-        if (!$isLeader && !$isAssignee) {
-            return response()->json(['success' => false, 'message' => 'Not authorized'], 403);
-        }
+        $isBulk = $request->has('items');
 
-        // Bulk add
-        if ($request->has('items') && is_array($request->items)) {
-            $validator = Validator::make($request->all(), [
-                'items' => 'required|array|min:1|max:20',
+        if ($isBulk) {
+            $request->validate([
+                'items'   => 'required|array|min:1|max:20',
                 'items.*' => 'required|string|max:500',
             ]);
-            if ($validator->fails()) return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
 
-            $maxOrder = $task->checklist()->max('order') ?? 0;
-            $created = [];
-            foreach ($request->items as $i => $content) {
-                $created[] = TaskChecklistItem::create([
-                    'task_id' => $taskId,
-                    'content' => $content,
-                    'order' => $maxOrder + $i + 1,
-                ]);
-            }
-            return response()->json(['success' => true, 'data' => $created], 201);
+            // Bug 011 Fix: wrap bulk creation in transaction
+            $items = DB::transaction(function () use ($request, $taskId) {
+                return collect($request->items)->map(fn($content) =>
+                    TaskChecklistItem::create([
+                        'task_id' => $taskId,
+                        'content' => $content,
+                    ])
+                );
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => count($request->items) . ' items added.',
+                'data'    => $items,
+            ], 201);
         }
 
-        // Single add
-        $validator = Validator::make($request->all(), ['content' => 'required|string|max:500']);
-        if ($validator->fails()) return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        $request->validate([
+            'content' => 'required|string|max:500',
+        ]);
 
-        $maxOrder = $task->checklist()->max('order') ?? 0;
         $item = TaskChecklistItem::create([
             'task_id' => $taskId,
             'content' => $request->content,
-            'order' => $maxOrder + 1,
         ]);
 
-        return response()->json(['success' => true, 'data' => $item], 201);
+        return response()->json([
+            'success' => true,
+            'message' => 'Checklist item added.',
+            'data'    => $item,
+        ], 201);
     }
 
-    /**
-     * PUT /teams/{teamId}/tasks/{taskId}/checklist/{itemId}/toggle
-     */
-    public function toggle($teamId, $taskId, $itemId)
+    public function toggle($teamId, $taskId, $itemId): JsonResponse
     {
-        $this->ensureMember($teamId);
-        $task = TeamTask::where('team_id', $teamId)->findOrFail($taskId);
+        TeamTask::where('team_id', $teamId)->findOrFail($taskId);
         $item = TaskChecklistItem::where('task_id', $taskId)->findOrFail($itemId);
 
-        $user = auth()->user();
-        $item->update([
-            'is_completed' => !$item->is_completed,
-            'completed_by' => !$item->is_completed ? $user->id : null,
-            'completed_at' => !$item->is_completed ? now() : null,
-        ]);
+        if ($item->is_completed) {
+            $item->update([
+                'is_completed'  => false,
+                'completed_by'  => null,
+                'completed_at'  => null,
+            ]);
+        } else {
+            $item->update([
+                'is_completed'  => true,
+                'completed_by'  => auth()->id(),
+                'completed_at'  => now(),
+            ]);
+        }
 
-        $item->load('completedByUser:id,name,profile_photo');
-        $progress = $task->checklistProgress();
-
-        return response()->json(['success' => true, 'data' => ['item' => $item, 'progress' => $progress]]);
+        return response()->json(['success' => true, 'data' => $item->load('completedBy')]);
     }
 
-    /**
-     * PUT /teams/{teamId}/tasks/{taskId}/checklist/{itemId}
-     */
-    public function update(Request $request, $teamId, $taskId, $itemId)
+    public function update(Request $request, $teamId, $taskId, $itemId): JsonResponse
     {
-        $team = Team::findOrFail($teamId);
-        $user = auth()->user();
-        $isLeader = $team->created_by === $user->id || $user->role === 'admin';
-        if (!$isLeader) return response()->json(['success' => false, 'message' => 'Not authorized'], 403);
-
+        TeamTask::where('team_id', $teamId)->findOrFail($taskId);
         $item = TaskChecklistItem::where('task_id', $taskId)->findOrFail($itemId);
 
-        $validator = Validator::make($request->all(), [
-            'content' => 'sometimes|string|max:500',
-            'order' => 'sometimes|integer|min:0',
-        ]);
-        if ($validator->fails()) return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        $request->validate(['content' => 'required|string|max:500']);
 
-        $item->update($request->only(['content', 'order']));
-        return response()->json(['success' => true, 'data' => $item]);
+        $item->update(['content' => $request->content]);
+
+        return response()->json(['success' => true, 'message' => 'Item updated.', 'data' => $item]);
     }
 
-    /**
-     * DELETE /teams/{teamId}/tasks/{taskId}/checklist/{itemId}
-     */
-    public function destroy($teamId, $taskId, $itemId)
+    public function destroy($teamId, $taskId, $itemId): JsonResponse
     {
-        $team = Team::findOrFail($teamId);
-        $user = auth()->user();
-        $isLeader = $team->created_by === $user->id || $user->role === 'admin';
-        if (!$isLeader) return response()->json(['success' => false, 'message' => 'Not authorized'], 403);
-
+        TeamTask::where('team_id', $teamId)->findOrFail($taskId);
         $item = TaskChecklistItem::where('task_id', $taskId)->findOrFail($itemId);
+
         $item->delete();
 
-        return response()->json(['success' => true, 'message' => 'Item deleted']);
-    }
-
-    private function ensureMember($teamId)
-    {
-        if (auth()->user()->role === 'admin') return;
-        $isMember = TeamMember::where('team_id', $teamId)->where('user_id', auth()->id())->exists();
-        if (!$isMember) abort(403, 'Not a team member');
+        return response()->json(['success' => true, 'message' => 'Item deleted.']);
     }
 }

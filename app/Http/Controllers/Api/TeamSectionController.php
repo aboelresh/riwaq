@@ -3,206 +3,130 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Team\AddSectionMembersRequest;
+use App\Http\Requests\Team\StoreSectionRequest;
+use App\Http\Requests\Team\UpdateSectionRequest;
 use App\Models\Team;
 use App\Models\TeamSection;
-use App\Models\TeamMember;
-use App\Services\NotificationService;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Http\JsonResponse;
 
 class TeamSectionController extends Controller
 {
-    /**
-     * GET /teams/{teamId}/sections
-     */
-    public function index($teamId)
+    private function ensureMember(Team $team): void
+    {
+        $user = auth()->user();
+        if ($user->isAdmin()) return;
+        if (!$team->members()->where('user_id', $user->id)->exists()) {
+            abort(403, 'Not a team member.');
+        }
+    }
+
+    private function ensureLeader(Team $team): void
+    {
+        $user = auth()->user();
+        if ($user->isAdmin()) return;
+        if ($team->created_by !== $user->id) {
+            abort(403, 'Only the team leader can perform this action.');
+        }
+    }
+
+    public function index($teamId): JsonResponse
     {
         $team = Team::findOrFail($teamId);
         $this->ensureMember($team);
 
-        $sections = TeamSection::where('team_id', $teamId)
-            ->with('members:id,name,email,profile_photo')
-            ->withCount('tasks')
-            ->orderBy('is_general', 'desc')
-            ->orderBy('created_at', 'asc')
-            ->get();
+        $sections = $team->sections()->withCount('tasks')->get();
 
         return response()->json(['success' => true, 'data' => $sections]);
     }
 
-    /**
-     * POST /teams/{teamId}/sections
-     */
-    public function store(Request $request, $teamId)
+    public function store(StoreSectionRequest $request, $teamId): JsonResponse
     {
         $team = Team::findOrFail($teamId);
         $this->ensureLeader($team);
 
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:100',
-            'description' => 'nullable|string|max:500',
-            'color' => 'nullable|string|max:50',
-            'icon' => 'nullable|string|max:30',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
-        }
-
         $section = TeamSection::create([
-            'team_id' => $teamId,
-            'name' => $request->name,
-            'description' => $request->description,
+            'team_id'    => $teamId,
+            'name'       => $request->name,
+            'description'=> $request->description,
+            'color'      => $request->color,
+            'icon'       => $request->icon,
             'is_general' => false,
-            'color' => $request->color,
-            'icon' => $request->icon,
             'created_by' => auth()->id(),
         ]);
 
-        $section->load('members:id,name,email,profile_photo');
-
-        return response()->json(['success' => true, 'message' => 'Section created', 'data' => $section], 201);
+        return response()->json([
+            'success' => true,
+            'message' => 'Section created.',
+            'data'    => $section,
+        ], 201);
     }
 
-    /**
-     * PUT /teams/{teamId}/sections/{sectionId}
-     */
-    public function update(Request $request, $teamId, $sectionId)
+    public function update(UpdateSectionRequest $request, $teamId, $sectionId): JsonResponse
     {
-        $team = Team::findOrFail($teamId);
+        $team    = Team::findOrFail($teamId);
+        $section = TeamSection::where('team_id', $teamId)->findOrFail($sectionId);
         $this->ensureLeader($team);
 
-        $section = TeamSection::where('team_id', $teamId)->findOrFail($sectionId);
-
-        // Can't rename general section
-        $validator = Validator::make($request->all(), [
-            'name' => 'sometimes|string|max:100',
-            'description' => 'nullable|string|max:500',
-            'color' => 'nullable|string|max:50',
-            'icon' => 'nullable|string|max:30',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
-        }
-
-        $fields = $request->only(['description', 'color', 'icon']);
+        $fields = [];
         if (!$section->is_general && $request->has('name')) {
             $fields['name'] = $request->name;
         }
+        if ($request->has('description')) $fields['description'] = $request->description;
+        if ($request->has('color'))       $fields['color']       = $request->color;
+        if ($request->has('icon'))        $fields['icon']        = $request->icon;
 
         $section->update($fields);
-        $section->load('members:id,name,email,profile_photo');
 
-        return response()->json(['success' => true, 'data' => $section]);
+        return response()->json(['success' => true, 'message' => 'Section updated.', 'data' => $section]);
     }
 
-    /**
-     * DELETE /teams/{teamId}/sections/{sectionId}
-     */
-    public function destroy($teamId, $sectionId)
+    public function destroy($teamId, $sectionId): JsonResponse
     {
-        $team = Team::findOrFail($teamId);
+        $team    = Team::findOrFail($teamId);
+        $section = TeamSection::where('team_id', $teamId)->findOrFail($sectionId);
         $this->ensureLeader($team);
 
-        $section = TeamSection::where('team_id', $teamId)->findOrFail($sectionId);
-
         if ($section->is_general) {
-            return response()->json(['success' => false, 'message' => 'Cannot delete the general section'], 400);
+            return response()->json(['success' => false, 'message' => 'Cannot delete the general section.'], 400);
         }
 
-        // Move tasks to general section before deleting
-        $generalSection = $team->generalSection;
+        $generalSection = $team->sections()->where('is_general', true)->first();
         if ($generalSection) {
             $section->tasks()->update(['section_id' => $generalSection->id]);
         }
 
         $section->delete();
 
-        return response()->json(['success' => true, 'message' => 'Section deleted']);
+        return response()->json(['success' => true, 'message' => 'Section deleted. Tasks moved to General.']);
     }
 
-    /**
-     * POST /teams/{teamId}/sections/{sectionId}/members
-     * Body: { user_ids: [1, 2, 3], role: "member" }
-     */
-    public function addMembers(Request $request, $teamId, $sectionId)
+    public function addMembers(AddSectionMembersRequest $request, $teamId, $sectionId): JsonResponse
     {
-        $team = Team::findOrFail($teamId);
+        $team    = Team::findOrFail($teamId);
+        $section = TeamSection::where('team_id', $teamId)->findOrFail($sectionId);
         $this->ensureLeader($team);
 
-        $section = TeamSection::where('team_id', $teamId)->findOrFail($sectionId);
+        $teamMemberIds = $team->members()->pluck('user_id')->toArray();
+        $validUserIds  = array_intersect($request->user_ids, $teamMemberIds);
 
-        $validator = Validator::make($request->all(), [
-            'user_ids' => 'required|array|min:1',
-            'user_ids.*' => 'integer|exists:users,id',
-            'role' => 'nullable|string|in:lead,member',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        foreach ($validUserIds as $userId) {
+            $section->members()->syncWithoutDetaching([
+                $userId => ['role' => $request->role ?? 'member'],
+            ]);
         }
 
-        $role = $request->role ?? 'member';
-        $syncData = [];
-        foreach ($request->user_ids as $uid) {
-            // Verify user is a team member
-            $isMember = TeamMember::where('team_id', $teamId)->where('user_id', $uid)->exists();
-            if ($isMember) {
-                $syncData[$uid] = ['role' => $role];
-            }
-        }
-
-        $section->members()->syncWithoutDetaching($syncData);
-
-        // Notify added members
-        $user = auth()->user();
-        $notifyIds = array_filter(array_keys($syncData), fn($id) => $id !== $user->id);
-        if (!empty($notifyIds)) {
-            NotificationService::sendToMany(
-                $notifyIds, 'section_added',
-                'Added to "' . $section->name . '"',
-                $user->name . ' added you to section "' . $section->name . '" in "' . $team->name . '"',
-                ['team_id' => $teamId, 'section_id' => $sectionId, 'url' => '/teams/' . $teamId]
-            );
-        }
-
-        $section->load('members:id,name,email,profile_photo');
-        return response()->json(['success' => true, 'data' => $section]);
+        return response()->json(['success' => true, 'message' => 'Members added to section.']);
     }
 
-    /**
-     * DELETE /teams/{teamId}/sections/{sectionId}/members/{userId}
-     */
-    public function removeMember($teamId, $sectionId, $userId)
+    public function removeMember($teamId, $sectionId, $userId): JsonResponse
     {
-        $team = Team::findOrFail($teamId);
-        $this->ensureLeader($team);
-
+        $team    = Team::findOrFail($teamId);
         $section = TeamSection::where('team_id', $teamId)->findOrFail($sectionId);
-
-        if ($section->is_general) {
-            return response()->json(['success' => false, 'message' => 'Cannot remove from general section'], 400);
-        }
+        $this->ensureLeader($team);
 
         $section->members()->detach($userId);
 
-        return response()->json(['success' => true, 'message' => 'Member removed from section']);
-    }
-
-    private function ensureMember(Team $team)
-    {
-        if (auth()->user()->role === 'admin') return;
-        $isMember = TeamMember::where('team_id', $team->id)->where('user_id', auth()->id())->exists();
-        if (!$isMember) abort(403, 'Not a team member');
-    }
-
-    private function ensureLeader(Team $team)
-    {
-        $user = auth()->user();
-        if ($user->role === 'admin') return;
-        if ($team->created_by !== $user->id) {
-            abort(403, 'Only the team leader can manage sections');
-        }
+        return response()->json(['success' => true, 'message' => 'Member removed from section.']);
     }
 }
