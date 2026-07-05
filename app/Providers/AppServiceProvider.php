@@ -2,38 +2,35 @@
 
 namespace App\Providers;
 
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
-use App\Services\ProgressService;
-use App\Services\QuizService;
-use App\Services\UnlockService;
-use App\Services\VideoService;
 
 class AppServiceProvider extends ServiceProvider
 {
-    public function register(): void
-    {
-        $this->app->singleton(ProgressService::class, function ($app) {
-            return new ProgressService();
-        });
-
-        $this->app->singleton(QuizService::class, function ($app) {
-            return new QuizService();
-        });
-
-        $this->app->singleton(UnlockService::class, function ($app) {
-            return new UnlockService(
-                $app->make(ProgressService::class),
-                $app->make(QuizService::class)
-            );
-        });
-
-        $this->app->singleton(VideoService::class, function ($app) {
-            return new VideoService();
-        });
-    }
+    public function register(): void {}
 
     public function boot(): void
     {
-        //
+        // Auth routes: login, register, forgot-password
+        // 5 requests per minute per IP — stops brute force
+        RateLimiter::for('auth', function (Request $request) {
+            return Limit::perMinute(5)->by($request->ip());
+        });
+
+        // Sensitive routes: AI chat, video upload
+        // 10 requests per minute per user
+        RateLimiter::for('sensitive', function (Request $request) {
+            return Limit::perMinute(10)
+                ->by($request->user()?->id ?: $request->ip());
+        });
+
+        // General API: all authenticated routes
+        // 60 requests per minute per user
+        RateLimiter::for('api', function (Request $request) {
+            return Limit::perMinute(60)
+                ->by($request->user()?->id ?: $request->ip());
+        });
     }
 }
