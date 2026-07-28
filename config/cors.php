@@ -2,19 +2,29 @@
 
 return [
 
-    'paths' => ['api/*', 'sanctum/csrf-cookie'],
+    'paths' => ['api/*'],
 
-    'allowed_methods' => ['*'],
+    'allowed_methods' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 
-    'allowed_origins' => ['*'],
+    // In production: set CORS_ALLOWED_ORIGINS in .env to your actual frontend URLs
+    // Example: CORS_ALLOWED_ORIGINS=https://codemaster.com,https://app.codemaster.com
+    // In development: '*' is acceptable
+    'allowed_origins' => env('APP_ENV') === 'production'
+        ? explode(',', env('CORS_ALLOWED_ORIGINS', 'https://codemaster.com'))
+        : ['*'],
 
     'allowed_origins_patterns' => [],
 
-    'allowed_headers' => ['*'],
+    'allowed_headers' => [
+        'Content-Type',
+        'Authorization',
+        'X-Requested-With',
+        'Accept',
+    ],
 
     'exposed_headers' => [],
 
-    'max_age' => 0,
+    'max_age' => 86400,
 
     'supports_credentials' => false,
 

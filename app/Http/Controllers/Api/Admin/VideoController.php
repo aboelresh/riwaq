@@ -3,9 +3,10 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\StoreVideoRequest;
 use App\Services\VideoService;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 
 class VideoController extends Controller
 {
@@ -13,86 +14,64 @@ class VideoController extends Controller
         private VideoService $videoService
     ) {}
 
-    public function index()
+    public function index(): JsonResponse
     {
         $videos = $this->videoService->getAllVideos();
 
         return response()->json([
             'success' => true,
-            'data' => $videos
+            'data'    => $videos,
         ]);
     }
 
-    public function upload(Request $request)
+    public function upload(StoreVideoRequest $request): JsonResponse
     {
-        // Override PHP limits for large video uploads (works regardless of php.ini)
+        // Bug 016 Fix: removed ini_set() calls for upload_max_filesize/post_max_size
+        // These PHP directives are read before any code executes and cannot
+        // be changed at runtime. The correct values are set in public/.htaccess
+        // which is read by Apache before PHP starts.
+        // set_time_limit(300) is kept — it CAN be set at runtime safely.
         set_time_limit(300);
-        ini_set('max_execution_time', '300');
-        ini_set('upload_max_filesize', '512M');
-        ini_set('post_max_size', '600M');
-        ini_set('memory_limit', '1G');
 
-        $validator = Validator::make($request->all(), [
-            'title' => 'required|string|max:255',
-            'video' => 'required|file|mimes:mp4,avi,mov,wmv|max:512000',
-            'topic_id' => 'nullable|integer|exists:topics,id',
-        ]);
+        $video = $this->videoService->uploadVideo(
+            $request->file('video'),
+            auth()->user(),
+            $request->title,
+            $request->topic_id
+        );
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        try {
-            $video = $this->videoService->uploadVideo(
-                $request->file('video'),
-                auth()->user(),
-                $request->title,
-                $request->topic_id
-            );
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Video uploaded successfully',
-                'data' => $video
-            ], 201);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to upload video',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        return response()->json([
+            'success' => true,
+            'message' => 'Video uploaded successfully.',
+            'data'    => $video,
+        ], 201);
     }
 
-    public function show($id)
+    public function show($id): JsonResponse
     {
         $video = $this->videoService->getVideoById($id);
 
         if (!$video) {
             return response()->json([
                 'success' => false,
-                'message' => 'Video not found'
+                'message' => 'Video not found.',
             ], 404);
         }
 
         return response()->json([
             'success' => true,
-            'data' => $video
+            'data'    => $video,
         ]);
     }
 
-    public function destroy($id)
+    public function destroy($id): JsonResponse
     {
         $video = $this->videoService->getVideoById($id);
 
         if (!$video) {
             return response()->json([
                 'success' => false,
-                'message' => 'Video not found'
+                'message' => 'Video not found.',
             ], 404);
         }
 
@@ -100,7 +79,7 @@ class VideoController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Video deleted successfully'
+            'message' => 'Video deleted successfully.',
         ]);
     }
 }
