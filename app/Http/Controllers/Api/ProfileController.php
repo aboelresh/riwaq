@@ -3,53 +3,47 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
+use App\Http\Requests\Profile\UpdateProfileRequest;
+use App\Http\Resources\UserResource;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Storage;
 
 class ProfileController extends Controller
 {
-    public function show()
+    public function show(): JsonResponse
     {
         return response()->json([
             'success' => true,
-            'message' => 'Profile retrieved',
-            'data' => [
-                'user' => auth()->user(),
-            ],
+            'data'    => new UserResource(auth()->user()),
         ]);
     }
 
-    public function update(Request $request)
+    public function update(UpdateProfileRequest $request): JsonResponse
     {
-        $user = auth()->user();
+        $user   = auth()->user();
+        $fields = $request->only(['name', 'username', 'bio', 'goals']);
 
-        $validated = $request->validate([
-            'name' => 'sometimes|string|max:255',
-            'bio' => 'nullable|string|max:1000',
-            'goals' => 'nullable|string|max:1000',
-            'profile_photo' => 'nullable|image|max:2048',
-        ]);
-
+        // Profile photo upload
         if ($request->hasFile('profile_photo')) {
-            // Delete old photo if exists — use raw attribute (not accessor)
-            $rawPhoto = $user->getRawOriginal('profile_photo');
-            if ($rawPhoto) {
-                Storage::disk('public')->delete($rawPhoto);
+            // Delete old photo if exists
+            if ($user->profile_photo) {
+                Storage::disk('public')->delete($user->profile_photo);
             }
-
-            $path = $request->file('profile_photo')->store('profile-photos', 'public');
-            $validated['profile_photo'] = $path;
+            $fields['profile_photo'] = $request->file('profile_photo')
+                ->store('profile_photos', 'public');
         }
 
-        $validated['profile_completed'] = true;
-        $user->update($validated);
+        // Bug 008 Fix: only mark completed if meaningful fields are present
+        if (!empty($fields['name']) && !empty($fields['bio']) && !empty($fields['goals'])) {
+            $fields['profile_completed'] = true;
+        }
+
+        $user->update($fields);
 
         return response()->json([
             'success' => true,
-            'message' => 'Profile updated successfully',
-            'data' => [
-                'user' => $user->fresh(),
-            ],
+            'message' => 'Profile updated successfully.',
+            'data'    => new UserResource($user->fresh()),
         ]);
     }
 }
