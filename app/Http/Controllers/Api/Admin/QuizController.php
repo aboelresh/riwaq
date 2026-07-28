@@ -25,8 +25,8 @@ class QuizController extends Controller
 
     public function store(StoreQuizRequest $request): JsonResponse
     {
-        // DB::transaction() auto-rollback on exception — no try/catch needed.
-        // Any exception propagates to the global ApiExceptionHandler.
+        // DB::transaction() auto-rollbacks on any exception —
+        // no try/catch needed. Exception propagates to ApiExceptionHandler.
         $quiz = DB::transaction(function () use ($request) {
             $quiz = Quiz::create([
                 'title'           => $request->title,
@@ -78,7 +78,6 @@ class QuizController extends Controller
                 'pass_percentage' => $request->pass_percentage,
             ]);
 
-            // Replace all questions if provided
             if ($request->filled('questions')) {
                 $quiz->questions()->each(function ($q) {
                     $q->answers()->delete();

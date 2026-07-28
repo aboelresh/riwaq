@@ -32,13 +32,12 @@ class UpdateQuizRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'title.required'    => 'Quiz title is required.',
-            'type.in'           => 'Quiz type must be: assessment, topic, or course.',
+            'title.required'          => 'Quiz title is required.',
+            'type.in'                 => 'Quiz type must be: assessment, topic, or course.',
             'questions.*.answers.min' => 'Each question must have at least 2 answers.',
         ];
     }
 
-    // Bug 015 Fix applies to updates too
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {

@@ -46,16 +46,15 @@ class StoreQuizRequest extends FormRequest
 
     /**
      * Bug 015 Fix: ensure every question has at least one correct answer.
-     * The rules() above validate structure (min:2 answers, is_correct is boolean)
-     * but can't enforce that at least ONE answer per question is true.
-     * A quiz with zero correct answers cannot be passed — it's an invalid state.
+     * The rules() validate structure only — can't enforce that at least ONE
+     * answer per question is true. A quiz with zero correct answers is invalid.
      */
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
             foreach ($this->questions ?? [] as $index => $question) {
-                $answers    = $question['answers'] ?? [];
-                $hasCorrect = collect($answers)->contains('is_correct', true);
+                $hasCorrect = collect($question['answers'] ?? [])
+                    ->contains('is_correct', true);
 
                 if (!$hasCorrect) {
                     $validator->errors()->add(
