@@ -61,7 +61,7 @@ class TeamNoteController extends Controller
             'user_id'    => $request->user_id,
             'content'    => $request->content,
             'is_private' => $request->is_private,
-            'created_by' => auth()->id(),
+            'author_id' => auth()->id(),
         ]);
 
         return response()->json([
