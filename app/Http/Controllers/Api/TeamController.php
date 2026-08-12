@@ -309,65 +309,61 @@ class TeamController extends Controller
     }
 
     public function progress($id): JsonResponse
-    {
-        $team    = Team::with('members.user')->findOrFail($id);
-        $members = $team->members->map(function ($member) {
-            $user     = $member->user;
-            $viewed   = $user->topicProgress()->where('is_viewed', true)->count();
-            $passed   = $user->quizAttempts()->where('passed', true)->count();
+{
+    // Eager load all user relationships needed — single query instead of N+1
+    $team = Team::with([
+        'members.user.topicProgress' => fn($q) => $q->where('is_viewed', true),
+        'members.user.quizAttempts'  => fn($q) => $q->where('passed', true),
+    ])->findOrFail($id);
 
-            return [
-                'user'           => ['id' => $user->id, 'name' => $user->name],
-                'topics_viewed'  => $viewed,
-                'quizzes_passed' => $passed,
-            ];
-        });
+    $members = $team->members->map(function ($member) {
+        $user = $member->user;
+        return [
+            'user'           => ['id' => $user->id, 'name' => $user->name],
+            'topics_viewed'  => $user->topicProgress->count(),
+            'quizzes_passed' => $user->quizAttempts->count(),
+        ];
+    });
 
-        return response()->json(['success' => true, 'data' => $members]);
-    }
+    return response()->json(['success' => true, 'data' => $members]);
+}
 
     public function activity($id): JsonResponse
-    {
-        $team = Team::with('members.user')->findOrFail($id);
+{
+    // Eager load everything needed — avoids N queries per member
+    $team = Team::with([
+        'members.user.topicProgress' => fn($q) =>
+            $q->where('is_viewed', true)->with('topic')->latest('updated_at')->limit(5),
+        'members.user.quizAttempts'  => fn($q) =>
+            $q->where('passed', true)->with('quiz')->latest()->limit(5),
+    ])->findOrFail($id);
 
-        $activities = collect();
+    $activities = collect();
 
-        foreach ($team->members as $member) {
-            $user = $member->user;
+    foreach ($team->members as $member) {
+        $user = $member->user;
 
-            $user->topicProgress()
-                ->where('is_viewed', true)
-                ->with('topic')
-                ->latest('updated_at')
-                ->limit(5)
-                ->get()
-                ->each(fn($p) => $activities->push([
-                    'type'       => 'topic_viewed',
-                    'user'       => ['id' => $user->id, 'name' => $user->name],
-                    'topic'      => $p->topic?->title,
-                    'created_at' => $p->updated_at,
-                ]));
+        $user->topicProgress->each(fn($p) => $activities->push([
+            'type'       => 'topic_viewed',
+            'user'       => ['id' => $user->id, 'name' => $user->name],
+            'topic'      => $p->topic?->title,
+            'created_at' => $p->updated_at,
+        ]));
 
-            $user->quizAttempts()
-                ->where('passed', true)
-                ->with('quiz')
-                ->latest()
-                ->limit(5)
-                ->get()
-                ->each(fn($a) => $activities->push([
-                    'type'       => 'quiz_passed',
-                    'user'       => ['id' => $user->id, 'name' => $user->name],
-                    'quiz'       => $a->quiz?->title,
-                    'score'      => $a->score,
-                    'created_at' => $a->created_at,
-                ]));
-        }
-
-        return response()->json([
-            'success' => true,
-            'data'    => $activities->sortByDesc('created_at')->values()->take(30),
-        ]);
+        $user->quizAttempts->each(fn($a) => $activities->push([
+            'type'       => 'quiz_passed',
+            'user'       => ['id' => $user->id, 'name' => $user->name],
+            'quiz'       => $a->quiz?->title,
+            'score'      => $a->score,
+            'created_at' => $a->created_at,
+        ]));
     }
+
+    return response()->json([
+        'success' => true,
+        'data'    => $activities->sortByDesc('created_at')->values()->take(30),
+    ]);
+}
 
     public function achievements($id, $userId): JsonResponse
     {
