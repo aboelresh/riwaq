@@ -35,17 +35,24 @@ use App\Http\Controllers\Api\TrackController;
 use App\Http\Controllers\Api\VideoStreamController;
 use Illuminate\Support\Facades\Route;
 
-// ── Health Check ───────────────────────────────────────────────────────────
+// ── API v1 wrapper ──────────────────────────────────────────────────────────
+// All routes are under /api/v1/ prefix for future versioning support.
+// When v2 is needed, create routes/api_v2.php without breaking v1 clients.
+Route::prefix('v1')->group(function () {
+
+// Health check
 Route::get('/', fn() => response()->json([
     'success' => true,
     'message' => 'Code Master API',
     'version' => '1.0.0',
 ]));
 
-// ── Auth — rate limited 5/min per IP ───────────────────────────────────────
+// ─── Auth (rate limited: 5/min per IP) ────────────────────────────────────
 Route::middleware('throttle:auth')->prefix('auth')->group(function () {
-    Route::post('register',        [RegisterController::class, 'register']);
-    Route::post('login',           [LoginController::class, 'login']);
+    Route::post('register', [RegisterController::class, 'register']);
+    Route::post('login',    [LoginController::class, 'login']);
+
+    // Forgot + Reset Password (uses same 6-digit code mechanism as verification)
     Route::post('forgot-password', [ForgotPasswordController::class, 'send']);
     Route::post('reset-password',  [ResetPasswordController::class, 'reset']);
 
@@ -56,164 +63,169 @@ Route::middleware('throttle:auth')->prefix('auth')->group(function () {
     });
 });
 
-// ── Public browsing ────────────────────────────────────────────────────────
-Route::get('/tracks',       [TrackController::class, 'index']);
-Route::get('/tracks/{id}',  [TrackController::class, 'show'])->where('id', '[0-9]+');
-Route::get('/courses',      [CourseController::class, 'index']);
-Route::get('/courses/{id}', [CourseController::class, 'show'])->where('id', '[0-9]+');
+// ─── Public browsing (no auth needed) ─────────────────────────────────────
+Route::get('/tracks',          [TrackController::class, 'index']);
+Route::get('/tracks/{id}',     [TrackController::class, 'show'])->where('id', '[0-9]+');
+Route::get('/courses',         [CourseController::class, 'index']);
+Route::get('/courses/{id}',    [CourseController::class, 'show'])->where('id', '[0-9]+');
 
-// ── Authenticated — rate limited 60/min per user ───────────────────────────
+// ─── Authenticated routes (rate limited: 60/min per user) ─────────────────
 Route::middleware(['auth:api', 'throttle:api'])->group(function () {
 
     // Search
     Route::get('/search', [SearchController::class, 'search']);
 
-    // AI Chat — sensitive: 10/min per user
+    // AI Chat (sensitive: 10/min per user)
     Route::middleware('throttle:sensitive')
-         ->post('/ai/chat', [AiChatController::class, 'chat']);
+        ->post('/ai/chat', [AiChatController::class, 'chat']);
 
-    // Video streaming
-    Route::get('/videos/stream/{topicId}', [VideoStreamController::class, 'stream']);
-
-    // Tracks (authenticated)
-    Route::get('/tracks/my-tracks',         [TrackController::class, 'myTracks']);
-    Route::post('/tracks/{id}/enroll',      [TrackController::class, 'enroll']);
-    Route::post('/tracks/{id}/switch',      [TrackController::class, 'switchTrack']);
+    // Tracks
+    Route::prefix('tracks')->group(function () {
+        Route::get('/my-tracks',      [TrackController::class, 'myTracks']);
+        Route::post('/{id}/enroll',   [TrackController::class, 'enroll']);
+        Route::post('/{id}/switch',   [TrackController::class, 'switchTrack']);
+    });
 
     // Topics
-    Route::get('/topics/{id}',                  [TopicController::class, 'show']);
-    Route::post('/topics/{id}/mark-viewed',     [TopicController::class, 'markAsViewed']);
-    Route::get('/topics/{id}/video-progress',   [TopicController::class, 'getVideoProgress']);
-    Route::post('/topics/{id}/video-progress',  [TopicController::class, 'updateVideoProgress']);
+    Route::prefix('topics/{id}')->group(function () {
+        Route::get('/',               [TopicController::class, 'show']);
+        Route::post('/mark-viewed',   [TopicController::class, 'markAsViewed']);
+        Route::get('/video-progress', [TopicController::class, 'getVideoProgress']);
+        Route::post('/video-progress',[TopicController::class, 'updateVideoProgress']);
+    });
+
+    // Videos
+    Route::get('/videos/stream/{id}', [VideoStreamController::class, 'stream']);
 
     // Quizzes
-    Route::get('/quizzes/{id}',                       [QuizController::class, 'show']);
-    Route::post('/quizzes/{id}/submit',               [QuizController::class, 'submit']);
-    Route::get('/quizzes/attempts/{attemptId}/result',[QuizController::class, 'result']);
+    Route::prefix('quizzes')->group(function () {
+        Route::get('/{id}',              [QuizController::class, 'show']);
+        Route::post('/{id}/submit',      [QuizController::class, 'submit']);
+        Route::get('/attempts/{id}/result', [QuizController::class, 'result']);
+    });
 
     // Assessment
-    Route::get('/assessment/questions',  [AssessmentController::class, 'getQuestions']);
-    Route::post('/assessment/submit',    [AssessmentController::class, 'submit']);
-    Route::get('/assessment/my-result',  [AssessmentController::class, 'getMyResult']);
+    Route::prefix('assessment')->group(function () {
+        Route::get('/questions',  [AssessmentController::class, 'getQuestions']);
+        Route::post('/submit',    [AssessmentController::class, 'submit']);
+        Route::get('/my-result',  [AssessmentController::class, 'getMyResult']);
+    });
 
     // Progress
-    Route::get('/progress',               [ProgressController::class, 'index']);
-    Route::get('/progress/level-analysis',[LevelAnalysisController::class, 'show']);
-
-    // Profile
-    Route::get('/profile',        [ProfileController::class, 'show']);
-    Route::post('/profile/update',[ProfileController::class, 'update']);
+    Route::prefix('progress')->group(function () {
+        Route::get('/',              [ProgressController::class, 'index']);
+        Route::get('/level-analysis',[LevelAnalysisController::class, 'index']);
+    });
 
     // Analytics
     Route::get('/analytics', [AnalyticsController::class, 'index']);
 
+    // Profile
+    Route::prefix('profile')->group(function () {
+        Route::get('/',       [ProfileController::class, 'show']);
+        Route::post('/update',[ProfileController::class, 'update']);
+    });
+
     // Notifications
-    Route::get('/notifications',              [NotificationController::class, 'index']);
-    Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
-    Route::post('/notifications/read-all',    [NotificationController::class, 'markAllRead']);
-    Route::post('/notifications/{id}/read',   [NotificationController::class, 'markRead']);
-
-    // ── Teams ──────────────────────────────────────────────────────────────
-    Route::get('/teams/my-teams',    [TeamController::class, 'myTeams']);
-    Route::get('/teams/search-user', [TeamController::class, 'searchUser']);
-    Route::get('/teams/my-tasks',    [TeamTaskController::class, 'myTasks']);
-    Route::post('/teams/create',     [TeamController::class, 'create']);
-    Route::post('/teams/join',       [TeamController::class, 'join']);
-
-    // Team base
-    Route::get('/teams/{id}',                    [TeamController::class, 'show']);
-    Route::put('/teams/{id}',                    [TeamController::class, 'update']);
-    Route::delete('/teams/{id}',                 [TeamController::class, 'destroy']);
-    Route::post('/teams/{id}/leave',             [TeamController::class, 'leave']);
-    Route::get('/teams/{id}/progress',           [TeamController::class, 'progress']);
-    Route::get('/teams/{id}/activity',           [TeamController::class, 'activity']);
-    Route::get('/teams/{id}/achievements/{uid}', [TeamController::class, 'achievements']);
-    Route::delete('/teams/{id}/members/{uid}',   [TeamController::class, 'kickMember']);
-    Route::post('/teams/{id}/invite',            [TeamController::class, 'inviteByUsername']);
-    Route::post('/teams/{id}/invite-email',      [TeamController::class, 'inviteByEmail']);
-
-    // Sections
-    Route::get('/teams/{teamId}/sections',                           [TeamSectionController::class, 'index']);
-    Route::post('/teams/{teamId}/sections',                          [TeamSectionController::class, 'store']);
-    Route::put('/teams/{teamId}/sections/{sectionId}',               [TeamSectionController::class, 'update']);
-    Route::delete('/teams/{teamId}/sections/{sectionId}',            [TeamSectionController::class, 'destroy']);
-    Route::post('/teams/{teamId}/sections/{sectionId}/members',      [TeamSectionController::class, 'addMembers']);
-    Route::delete('/teams/{teamId}/sections/{sectionId}/members/{userId}', [TeamSectionController::class, 'removeMember']);
-
-    // Notes
-    Route::get('/teams/{teamId}/notes',              [TeamNoteController::class, 'all']);
-    Route::get('/teams/{teamId}/notes/{userId}',     [TeamNoteController::class, 'index']);
-    Route::post('/teams/{teamId}/notes',             [TeamNoteController::class, 'store']);
-    Route::put('/teams/{teamId}/notes/{noteId}',     [TeamNoteController::class, 'update']);
-    Route::delete('/teams/{teamId}/notes/{noteId}',  [TeamNoteController::class, 'destroy']);
-
-    // Tasks
-    Route::get('/teams/{teamId}/tasks',              [TeamTaskController::class, 'index']);
-    Route::post('/teams/{teamId}/tasks',             [TeamTaskController::class, 'store']);
-    Route::put('/teams/{teamId}/tasks/{taskId}',     [TeamTaskController::class, 'update']);
-    Route::delete('/teams/{teamId}/tasks/{taskId}',  [TeamTaskController::class, 'destroy']);
-    Route::get('/teams/{teamId}/tasks/{taskId}/comments',  [TeamTaskController::class, 'comments']);
-    Route::post('/teams/{teamId}/tasks/{taskId}/comments', [TeamTaskController::class, 'addComment']);
-
-    // Checklist
-    Route::get('/teams/{teamId}/tasks/{taskId}/checklist',                  [TaskChecklistController::class, 'index']);
-    Route::post('/teams/{teamId}/tasks/{taskId}/checklist',                 [TaskChecklistController::class, 'store']);
-    Route::put('/teams/{teamId}/tasks/{taskId}/checklist/{itemId}',         [TaskChecklistController::class, 'update']);
-    Route::post('/teams/{teamId}/tasks/{taskId}/checklist/{itemId}/toggle', [TaskChecklistController::class, 'toggle']);
-    Route::delete('/teams/{teamId}/tasks/{taskId}/checklist/{itemId}',      [TaskChecklistController::class, 'destroy']);
-
-    // Challenges
-    Route::get('/teams/{teamId}/challenges',          [TeamChallengeController::class, 'index']);
-    Route::post('/teams/{teamId}/challenges',         [TeamChallengeController::class, 'store']);
-    Route::get('/teams/{teamId}/challenges/progress', [TeamChallengeController::class, 'progress']);
-
-    // Chat
-    Route::get('/teams/{teamId}/chat/channels',   [ChatController::class, 'getChannels']);
-    Route::get('/teams/{teamId}/chat/messages',   [ChatController::class, 'getMessages']);
-    Route::post('/teams/{teamId}/chat/messages',  [ChatController::class, 'sendMessage']);
-    Route::post('/teams/{teamId}/chat/dm',        [ChatController::class, 'getOrCreateDm']);
-});
-
-// ── Admin — rate limited 60/min per user ───────────────────────────────────
-Route::middleware(['auth:api', 'admin', 'throttle:api'])->prefix('admin')->group(function () {
-
-    // Users
-    Route::get('users',     [AdminUserController::class, 'index']);
-    Route::get('users/{id}',[AdminUserController::class, 'show']);
-
-    // Tracks
-    Route::get('tracks',        [AdminTrackController::class, 'index']);
-    Route::post('tracks',       [AdminTrackController::class, 'store']);
-    Route::put('tracks/{id}',   [AdminTrackController::class, 'update']);
-    Route::delete('tracks/{id}',[AdminTrackController::class, 'destroy']);
-
-    // Courses
-    Route::get('courses',        [AdminCourseController::class, 'index']);
-    Route::post('courses',       [AdminCourseController::class, 'store']);
-    Route::put('courses/{id}',   [AdminCourseController::class, 'update']);
-    Route::delete('courses/{id}',[AdminCourseController::class, 'destroy']);
-
-    // Topics
-    Route::get('topics',        [AdminTopicController::class, 'index']);
-    Route::post('topics',       [AdminTopicController::class, 'store']);
-    Route::put('topics/{id}',   [AdminTopicController::class, 'update']);
-    Route::delete('topics/{id}',[AdminTopicController::class, 'destroy']);
-
-    // Quizzes
-    Route::get('quizzes',        [AdminQuizController::class, 'index']);
-    Route::post('quizzes',       [AdminQuizController::class, 'store']);
-    Route::put('quizzes/{id}',   [AdminQuizController::class, 'update']);
-    Route::delete('quizzes/{id}',[AdminQuizController::class, 'destroy']);
-
-    // Videos — sensitive: 10/min per user
-    Route::middleware('throttle:sensitive')->group(function () {
-        Route::get('videos',          [AdminVideoController::class, 'index']);
-        Route::post('videos/upload',  [AdminVideoController::class, 'upload']);
-        Route::get('videos/{id}',     [AdminVideoController::class, 'show']);
-        Route::delete('videos/{id}',  [AdminVideoController::class, 'destroy']);
+    Route::prefix('notifications')->group(function () {
+        Route::get('/',                  [NotificationController::class, 'index']);
+        Route::get('/unread-count',      [NotificationController::class, 'unreadCount']);
+        Route::post('/read-all',         [NotificationController::class, 'markAllAsRead']);
+        Route::post('/{id}/read',        [NotificationController::class, 'markAsRead']);
     });
 
     // Teams
-    Route::get('teams',      [AdminTeamController::class, 'index']);
-    Route::get('teams/{id}', [AdminTeamController::class, 'show']);
+    Route::prefix('teams')->group(function () {
+          Route::get('/my-teams',   [TeamController::class, 'myTeams']);
+        Route::get('/my-tasks',   [TeamTaskController::class, 'myTasks']);
+        Route::get('/search-user',[TeamController::class, 'searchUser']);
+        Route::post('/create',    [TeamController::class, 'create']);
+        Route::post('/join',      [TeamController::class, 'join']);
+
+        Route::prefix('/{teamId}')->group(function () {
+            Route::get('/',         [TeamController::class, 'show']);
+            Route::put('/',         [TeamController::class, 'update']);
+            Route::delete('/',      [TeamController::class, 'destroy']);
+            Route::get('/progress', [TeamController::class, 'progress']);
+            Route::get('/activity', [TeamController::class, 'activity']);
+            Route::post('/leave',   [TeamController::class, 'leave']);
+            Route::get('/achievements/{userId}', [TeamController::class, 'achievements']);
+            Route::delete('/members/{userId}',   [TeamController::class, 'kickMember']);
+            Route::post('/invite',       [TeamController::class, 'inviteByUsername']);
+            Route::post('/invite-email', [TeamController::class, 'inviteByEmail']);
+
+            // Sections
+            Route::prefix('/sections')->group(function () {
+                Route::get('/',                           [TeamSectionController::class, 'index']);
+                Route::post('/',                          [TeamSectionController::class, 'store']);
+                Route::put('/{sectionId}',                [TeamSectionController::class, 'update']);
+                Route::delete('/{sectionId}',             [TeamSectionController::class, 'destroy']);
+                Route::post('/{sectionId}/members',       [TeamSectionController::class, 'addMembers']);
+                Route::delete('/{sectionId}/members/{userId}', [TeamSectionController::class, 'removeMember']);
+            });
+
+            // Notes
+            Route::prefix('/notes')->group(function () {
+                Route::get('/',           [TeamNoteController::class, 'all']);
+                Route::get('/{userId}',   [TeamNoteController::class, 'index']);
+                Route::post('/',          [TeamNoteController::class, 'store']);
+                Route::put('/{noteId}',   [TeamNoteController::class, 'update']);
+                Route::delete('/{noteId}',[TeamNoteController::class, 'destroy']);
+            });
+
+            // Tasks
+            Route::prefix('/tasks')->group(function () {
+                Route::get('/',          [TeamTaskController::class, 'index']);
+                Route::post('/',         [TeamTaskController::class, 'store']);
+                Route::put('/{taskId}',  [TeamTaskController::class, 'update']);
+                Route::delete('/{taskId}',[TeamTaskController::class, 'destroy']);
+                Route::get('/{taskId}/comments',  [TeamTaskController::class, 'comments']);
+                Route::post('/{taskId}/comments', [TeamTaskController::class, 'addComment']);
+
+                // Checklist
+                Route::prefix('/{taskId}/checklist')->group(function () {
+                    Route::get('/',             [TaskChecklistController::class, 'index']);
+                    Route::post('/',            [TaskChecklistController::class, 'store']);
+                    Route::put('/{itemId}',     [TaskChecklistController::class, 'update']);
+                    Route::post('/{itemId}/toggle', [TaskChecklistController::class, 'toggle']);
+                    Route::delete('/{itemId}',  [TaskChecklistController::class, 'destroy']);
+                });
+            });
+
+            // Challenges
+            Route::prefix('/challenges')->group(function () {
+                Route::get('/',          [TeamChallengeController::class, 'index']);
+                Route::post('/',         [TeamChallengeController::class, 'store']);
+                Route::get('/progress',  [TeamChallengeController::class, 'progress']);
+            });
+
+            // Chat
+            Route::prefix('/chat')->group(function () {
+                Route::get('/channels',  [ChatController::class, 'getChannels']);
+                Route::get('/messages',  [ChatController::class, 'getMessages']);
+                Route::post('/messages', [ChatController::class, 'sendMessage']);
+                Route::post('/dm',       [ChatController::class, 'getOrCreateDm']);
+            });
+        });
+    });
+});
+
+// ─── Admin routes (rate limited: 60/min per user) ─────────────────────────
+Route::middleware(['auth:api', 'admin', 'throttle:api'])->prefix('admin')->group(function () {
+    Route::apiResource('users',  AdminUserController::class)->only(['index', 'show']);
+    Route::apiResource('tracks', AdminTrackController::class)->except(['show']);
+    Route::apiResource('courses',AdminCourseController::class)->except(['show']);
+    Route::apiResource('topics', AdminTopicController::class)->except(['show']);
+    Route::apiResource('quizzes',AdminQuizController::class)->except(['show']);
+    Route::get('teams',          [AdminTeamController::class, 'index']);
+    Route::get('teams/{id}',     [AdminTeamController::class, 'show']);
+
+    // Video upload (sensitive: 10/min per user)
+    Route::middleware('throttle:sensitive')->group(function () {
+        Route::get('videos',            [AdminVideoController::class, 'index']);
+        Route::post('videos/upload',    [AdminVideoController::class, 'upload']);
+        Route::get('videos/{id}',       [AdminVideoController::class, 'show']);
+        Route::delete('videos/{id}',    [AdminVideoController::class, 'destroy']);
+    });
+});
 });

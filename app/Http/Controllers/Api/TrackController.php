@@ -8,6 +8,7 @@ use App\Models\UserTrack;
 use App\Models\UserQuizAttempt;
 use App\Services\UnlockService;
 use App\Services\ProgressService;
+use Illuminate\Http\JsonResponse;
 
 class TrackController extends Controller
 {
@@ -16,17 +17,24 @@ class TrackController extends Controller
         private ProgressService $progressService
     ) {}
 
-    public function index()
-    {
-        $tracks = Track::with(['creator', 'courses'])->get();
+    public function index(): JsonResponse
+{
+    $tracks = Track::with(['creator', 'courses'])
+        ->paginate(12);
 
-        return response()->json([
-            'success' => true,
-            'data' => $tracks
-        ]);
-    }
+    return response()->json([
+        'success' => true,
+        'data'    => $tracks->items(),
+        'meta'    => [
+            'current_page' => $tracks->currentPage(),
+            'per_page'     => $tracks->perPage(),
+            'total'        => $tracks->total(),
+            'last_page'    => $tracks->lastPage(),
+        ],
+    ]);
+}
 
-    public function show($id)
+    public function show($id): JsonResponse
     {
         $track = Track::with(['courses' => function($query) {
             $query->orderBy('order');

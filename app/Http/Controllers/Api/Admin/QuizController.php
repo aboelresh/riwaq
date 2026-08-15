@@ -14,14 +14,20 @@ use Illuminate\Support\Facades\DB;
 class QuizController extends Controller
 {
     public function index(): JsonResponse
-    {
-        $quizzes = Quiz::with(['creator', 'topic', 'course', 'questions.answers'])->get();
+{
+    $quizzes = Quiz::with(['creator', 'topic', 'course'])->paginate(20);
 
-        return response()->json([
-            'success' => true,
-            'data'    => $quizzes,
-        ]);
-    }
+    return response()->json([
+        'success' => true,
+        'data'    => $quizzes->items(),
+        'meta'    => [
+            'current_page' => $quizzes->currentPage(),
+            'per_page'     => $quizzes->perPage(),
+            'total'        => $quizzes->total(),
+            'last_page'    => $quizzes->lastPage(),
+        ],
+    ]);
+}
 
     public function store(StoreQuizRequest $request): JsonResponse
     {

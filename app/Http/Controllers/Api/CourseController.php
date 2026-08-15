@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Course;
 use App\Services\UnlockService;
+use Illuminate\Http\JsonResponse;
 
 class CourseController extends Controller
 {
@@ -15,32 +16,33 @@ class CourseController extends Controller
     /**
      * Public: list all courses with their track info and topic count.
      */
-    public function index()
-    {
-        $courses = Course::with(['tracks' => function ($q) {
-            $q->select('tracks.id', 'tracks.title');
-        }])
+    public function index(): JsonResponse
+{
+    $courses = Course::with(['tracks' => fn($q) => $q->select('tracks.id', 'tracks.title')])
         ->withCount('topics')
-        ->get()
-        ->map(function ($course) {
-            return [
-                'id' => $course->id,
-                'title' => $course->title,
-                'description' => $course->description,
-                'topics_count' => $course->topics_count,
-                'track' => $course->tracks->first() ? [
-                    'id' => $course->tracks->first()->id,
-                    'title' => $course->tracks->first()->title,
-                ] : null,
-            ];
-        });
+        ->paginate(15);
 
-        return response()->json([
-            'success' => true,
-            'data' => $courses,
-        ]);
-    }
+    $items = collect($courses->items())->map(fn($course) => [
+        'id'           => $course->id,
+        'title'        => $course->title,
+        'description'  => $course->description,
+        'topics_count' => $course->topics_count,
+        'track'        => $course->tracks->first()
+            ? ['id' => $course->tracks->first()->id, 'title' => $course->tracks->first()->title]
+            : null,
+    ]);
 
+    return response()->json([
+        'success' => true,
+        'data'    => $items,
+        'meta'    => [
+            'current_page' => $courses->currentPage(),
+            'per_page'     => $courses->perPage(),
+            'total'        => $courses->total(),
+            'last_page'    => $courses->lastPage(),
+        ],
+    ]);
+}
     public function show($id)
     {
         $user = auth()->user();

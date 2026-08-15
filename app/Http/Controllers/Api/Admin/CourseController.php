@@ -13,15 +13,20 @@ use Illuminate\Support\Facades\DB;
 class CourseController extends Controller
 {
     public function index(): JsonResponse
-    {
-        $courses = Course::with(['creator', 'topics', 'tracks'])->get();
+{
+    $courses = Course::with(['creator', 'topics', 'tracks'])->paginate(20);
 
-        return response()->json([
-            'success' => true,
-            'data'    => CourseResource::collection($courses),
-        ]);
-    }
-
+    return response()->json([
+        'success' => true,
+        'data'    => CourseResource::collection($courses->items()),
+        'meta'    => [
+            'current_page' => $courses->currentPage(),
+            'per_page'     => $courses->perPage(),
+            'total'        => $courses->total(),
+            'last_page'    => $courses->lastPage(),
+        ],
+    ]);
+}
     public function store(StoreCourseRequest $request): JsonResponse
     {
         $course = Course::create([

@@ -11,15 +11,21 @@ use Illuminate\Http\JsonResponse;
 
 class TrackController extends Controller
 {
-    public function index(): JsonResponse
-    {
-        $tracks = Track::with(['creator', 'courses'])->get();
+   public function index(): JsonResponse
+{
+    $tracks = Track::with(['creator', 'courses'])->paginate(20);
 
-        return response()->json([
-            'success' => true,
-            'data'    => TrackResource::collection($tracks),
-        ]);
-    }
+    return response()->json([
+        'success' => true,
+        'data'    => TrackResource::collection($tracks->items()),
+        'meta'    => [
+            'current_page' => $tracks->currentPage(),
+            'per_page'     => $tracks->perPage(),
+            'total'        => $tracks->total(),
+            'last_page'    => $tracks->lastPage(),
+        ],
+    ]);
+}
 
     public function store(StoreTrackRequest $request): JsonResponse
     {

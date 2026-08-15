@@ -12,14 +12,20 @@ use Illuminate\Http\JsonResponse;
 class TopicController extends Controller
 {
     public function index(): JsonResponse
-    {
-        $topics = Topic::all();
+{
+    $topics = Topic::paginate(20);
 
-        return response()->json([
-            'success' => true,
-            'data'    => TopicResource::collection($topics),
-        ]);
-    }
+    return response()->json([
+        'success' => true,
+        'data'    => TopicResource::collection($topics->items()),
+        'meta'    => [
+            'current_page' => $topics->currentPage(),
+            'per_page'     => $topics->perPage(),
+            'total'        => $topics->total(),
+            'last_page'    => $topics->lastPage(),
+        ],
+    ]);
+}
 
     public function store(StoreTopicRequest $request): JsonResponse
     {

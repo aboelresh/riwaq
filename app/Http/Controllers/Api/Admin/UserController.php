@@ -6,18 +6,32 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class UserController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        // Bug 013 Fix: use UserResource — hides password, verification_code,
-        // remember_token from response automatically
-        $users = User::paginate(20);
+        $query = User::query();
+
+        if ($request->filled('role')) {
+            $query->where('role', $request->role);
+        }
+
+        if ($request->filled('search')) {
+            $s = $request->search;
+            $query->where(fn($q) =>
+                $q->where('name', 'like', "%{$s}%")
+                  ->orWhere('email', 'like', "%{$s}%")
+                  ->orWhere('username', 'like', "%{$s}%")
+            );
+        }
+
+        $users = $query->latest()->paginate(20);
 
         return response()->json([
             'success' => true,
-            'data'    => UserResource::collection($users),
+            'data'    => UserResource::collection($users->items()),
             'meta'    => [
                 'current_page' => $users->currentPage(),
                 'per_page'     => $users->perPage(),
@@ -29,11 +43,9 @@ class UserController extends Controller
 
     public function show($id): JsonResponse
     {
-        $user = User::findOrFail($id);
-
         return response()->json([
             'success' => true,
-            'data'    => new UserResource($user),
+            'data'    => new UserResource(User::findOrFail($id)),
         ]);
     }
 }
