@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use Illuminate\Support\Facades\Event;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -32,5 +33,21 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(60)
                 ->by($request->user()?->id ?: $request->ip());
         });
+
+            // Domain Events
+\Illuminate\Support\Facades\Event::listen(
+    \App\Events\TopicCompleted::class,
+    [\App\Listeners\SendMilestoneNotification::class, 'handleTopicCompleted']
+);
+
+\Illuminate\Support\Facades\Event::listen(
+    \App\Events\CourseCompleted::class,
+    [\App\Listeners\SendMilestoneNotification::class, 'handleCourseCompleted']
+);
+
+\Illuminate\Support\Facades\Event::listen(
+    \App\Events\TrackCompleted::class,
+    [\App\Listeners\SendMilestoneNotification::class, 'handleTrackCompleted']
+);
     }
 }

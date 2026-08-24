@@ -40,8 +40,15 @@ class RegisterController extends Controller
         }
 
         $token = auth('api')->login($user);
-
-        return response()->json([
+        
+    \App\Services\NotificationService::send(
+    userId: $user->id,
+    type:   'welcome',
+    title:  '👋 Welcome to Code Master!',
+    body:   "Hi {$user->name}! Start by taking the assessment quiz to find your perfect learning track.",
+    data:   ['url' => '/assessment']);
+        
+    return response()->json([
             'success' => true,
             'message' => 'Registration successful! Check your email for verification code.',
             'data'    => [
