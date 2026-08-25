@@ -6,12 +6,10 @@ use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Resources\UserResource;
-use App\Mail\VerificationCodeMail;
+use App\Jobs\SendVerificationEmailJob;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 
 class RegisterController extends Controller
 {
@@ -29,26 +27,19 @@ class RegisterController extends Controller
             'verification_code_expires_at' => now()->addMinutes(15),
         ]);
 
-        try {
-            Mail::to($user->email)->send(new VerificationCodeMail($user, $verificationCode));
-        } catch (\Exception $e) {
-            Log::error('Failed to send verification email', [
-                'user_id' => $user->id,
-                'email'   => $user->email,
-                'error'   => $e->getMessage(),
-            ]);
-        }
+        SendVerificationEmailJob::dispatch($user, $verificationCode);
+
+        \App\Services\NotificationService::send(
+            userId: $user->id,
+            type:   'welcome',
+            title:  '👋 Welcome to Code Master!',
+            body:   "Hi {$user->name}! Start by taking the assessment quiz to find your perfect learning track.",
+            data:   ['url' => '/assessment']
+        );
 
         $token = auth('api')->login($user);
-        
-    \App\Services\NotificationService::send(
-    userId: $user->id,
-    type:   'welcome',
-    title:  '👋 Welcome to Code Master!',
-    body:   "Hi {$user->name}! Start by taking the assessment quiz to find your perfect learning track.",
-    data:   ['url' => '/assessment']);
-        
-    return response()->json([
+
+        return response()->json([
             'success' => true,
             'message' => 'Registration successful! Check your email for verification code.',
             'data'    => [

@@ -11,9 +11,6 @@ use Illuminate\Support\Facades\DB;
 
 class ChatController extends Controller
 {
-    /**
-     * GET /teams/{id}/chat/channels
-     */
     public function getChannels(Request $request, $teamId)
     {
         $user = auth()->user();
@@ -22,10 +19,8 @@ class ChatController extends Controller
             return response()->json(['success' => false, 'message' => 'Not a member'], 403);
         }
 
-        // Team channel
         $team = \App\Models\Team::select('id', 'name')->find($teamId);
 
-        // User's sections
         $sections = DB::table('team_sections')
             ->where('team_sections.team_id', $teamId)
             ->where(function ($q) use ($user) {
@@ -34,7 +29,6 @@ class ChatController extends Controller
                         ->whereColumn('team_section_members.section_id', 'team_sections.id')
                         ->where('team_section_members.user_id', $user->id);
                 })->orWhere(function () use ($user) {
-                    // Admin/leader sees all
                     if ($user->role === 'admin') return true;
                 });
             })
@@ -43,7 +37,6 @@ class ChatController extends Controller
             ->orderBy('name')
             ->get();
 
-        // User's DM channels
         $dms = DmChannel::where('team_id', $teamId)
             ->where(function ($q) use ($user) {
                 $q->where('user_one_id', $user->id)->orWhere('user_two_id', $user->id);
@@ -68,9 +61,6 @@ class ChatController extends Controller
         ]);
     }
 
-    /**
-     * GET /teams/{id}/chat/messages
-     */
     public function getMessages(Request $request, $teamId)
     {
         $user = auth()->user();
@@ -96,9 +86,7 @@ class ChatController extends Controller
         return response()->json(['success' => true, 'data' => $messages]);
     }
 
-    /**
-     * POST /teams/{id}/chat/messages
-     */
+
     public function sendMessage(Request $request, $teamId)
     {
         $user = auth()->user();
@@ -114,7 +102,6 @@ class ChatController extends Controller
             'reply_to_id' => 'nullable|integer|exists:chat_messages,id',
         ]);
 
-        // Verify channel access
         if ($validated['channel_type'] === 'section') {
             $inSection = DB::table('team_section_members')
                 ->where('section_id', $validated['channel_id'])
@@ -142,21 +129,24 @@ class ChatController extends Controller
 
         $message->load('user:id,name,profile_photo', 'replyTo:id,content,user_id');
 
-        broadcast(new ChatMessageSent($message))->toOthers();
+    try {
+         broadcast(new ChatMessageSent($message))->toOthers();
+        } catch (\Throwable $e) {
+         \Illuminate\Support\Facades\Log::warning('Chat broadcast failed', [
+         'message_id' => $message->id,
+         'error'      => $e->getMessage(),]);
 
         return response()->json(['success' => true, 'data' => $message]);
+        }
     }
 
-    /**
-     * POST /teams/{id}/chat/dm
-     */
+
     public function getOrCreateDm(Request $request, $teamId)
     {
         $user = auth()->user();
         $validated = $request->validate(['user_id' => 'required|integer']);
         $otherUserId = $validated['user_id'];
 
-        // Both must be team members
         $bothMembers = DB::table('team_members')->where('team_id', $teamId)
             ->whereIn('user_id', [$user->id, $otherUserId])
             ->count() >= 2;
@@ -164,7 +154,6 @@ class ChatController extends Controller
             return response()->json(['success' => false, 'message' => 'Both must be team members'], 400);
         }
 
-        // Normalize order
         $userOneId = min($user->id, $otherUserId);
         $userTwoId = max($user->id, $otherUserId);
 

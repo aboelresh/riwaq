@@ -66,14 +66,7 @@ class VerificationController extends Controller
             'verification_code_expires_at' => now()->addMinutes(15),
         ]);
 
-        try {
-            Mail::to($user->email)->send(new VerificationCodeMail($user, $code));
-        } catch (\Exception $e) {
-            Log::error('Failed to resend verification email', [
-                'user_id' => $user->id,
-                'error'   => $e->getMessage(),
-            ]);
-        }
+        \App\Jobs\SendVerificationEmailJob::dispatch($user, $code);
 
         return response()->json([
             'success' => true,

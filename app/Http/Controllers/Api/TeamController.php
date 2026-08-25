@@ -279,15 +279,13 @@ class TeamController extends Controller
         if ($team->created_by !== $user->id && !$user->isAdmin()) {
             return response()->json(['success' => false, 'message' => 'Not authorized.'], 403);
         }
-
-        try {
-            Mail::to($request->email)->send(
-                new TeamInviteMail($team->name, $team->code, $user->name, $team->type ?? 'learning')
-            );
-        } catch (\Exception $e) {
-            Log::error('Failed to send team invite email', ['error' => $e->getMessage()]);
-            return response()->json(['success' => false, 'message' => 'Failed to send invitation email.'], 500);
-        }
+        
+    \App\Jobs\SendTeamInviteEmailJob::dispatch(
+        $request->email,
+        $team->name,
+        $team->code,
+        $user->name,
+        $team->type ?? 'learning');
 
         return response()->json(['success' => true, 'message' => 'Invitation email sent to ' . $request->email]);
     }
@@ -330,7 +328,6 @@ class TeamController extends Controller
 
     public function activity($id): JsonResponse
 {
-    // Eager load everything needed — avoids N queries per member
     $team = Team::with([
         'members.user.topicProgress' => fn($q) =>
             $q->where('is_viewed', true)->with('topic')->latest('updated_at')->limit(5),

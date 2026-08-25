@@ -4,11 +4,8 @@ namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\ForgotPasswordRequest;
-use App\Mail\VerificationCodeMail;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 
 class ForgotPasswordController extends Controller
 {
@@ -18,8 +15,7 @@ class ForgotPasswordController extends Controller
             strtolower(trim($request->email))
         ])->first();
 
-        // Always return 200 even if email not found — prevents user enumeration
-        // (attacker can't know if an email is registered or not)
+
         if (!$user) {
             return response()->json([
                 'success' => true,
@@ -34,14 +30,7 @@ class ForgotPasswordController extends Controller
             'verification_code_expires_at' => now()->addMinutes(15),
         ]);
 
-        try {
-            Mail::to($user->email)->send(new VerificationCodeMail($user, $code));
-        } catch (\Exception $e) {
-            Log::error('Failed to send password reset email', [
-                'user_id' => $user->id,
-                'error'   => $e->getMessage(),
-            ]);
-        }
+        \App\Jobs\SendPasswordResetEmailJob::dispatch($user, $code);
 
         return response()->json([
             'success' => true,
