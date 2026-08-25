@@ -8,6 +8,8 @@ use App\Http\Requests\Admin\UpdateTrackRequest;
 use App\Http\Resources\TrackResource;
 use App\Models\Track;
 use Illuminate\Http\JsonResponse;
+use App\Services\CacheService;
+use Illuminate\Support\Facades\Cache;
 
 class TrackController extends Controller
 {
@@ -43,6 +45,8 @@ class TrackController extends Controller
             $track->courses()->attach($courses);
         }
 
+        CacheService::clearTracks();
+
         return response()->json([
             'success' => true,
             'message' => 'Track created successfully',
@@ -67,6 +71,8 @@ class TrackController extends Controller
             $track->courses()->sync($courses);
         }
 
+        CacheService::clearTracks();
+
         return response()->json([
             'success' => true,
             'message' => 'Track updated successfully',
@@ -87,6 +93,7 @@ class TrackController extends Controller
         }
 
         $track->delete();
+        CacheService::clearTracks();
 
         return response()->json([
             'success' => true,

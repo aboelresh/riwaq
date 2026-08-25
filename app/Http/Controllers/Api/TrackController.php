@@ -9,6 +9,9 @@ use App\Models\UserQuizAttempt;
 use App\Services\UnlockService;
 use App\Services\ProgressService;
 use Illuminate\Http\JsonResponse;
+use App\Services\CacheService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class TrackController extends Controller
 {
@@ -17,34 +20,41 @@ class TrackController extends Controller
         private ProgressService $progressService
     ) {}
 
-    public function index(): JsonResponse
+public function index(Request $request): JsonResponse
 {
-    $tracks = Track::with(['creator', 'courses'])
-        ->paginate(12);
+    $page   = $request->get('page', 1);
+    $cacheKey = CacheService::tracksKey($page);
+
+    $data = Cache::remember($cacheKey, CacheService::TTL_TRACKS, function () {
+        $tracks = Track::with(['creator', 'courses'])->paginate(12);
+
+        return [
+            'data' => TrackResource::collection($tracks->items())->resolve(),
+            'meta' => [
+                'current_page' => $tracks->currentPage(),
+                'per_page'     => $tracks->perPage(),
+                'total'        => $tracks->total(),
+                'last_page'    => $tracks->lastPage(),
+            ],
+        ];
+    });
+
+    return response()->json(['success' => true] + $data);
+}
+
+public function show($id): JsonResponse
+{
+    $cacheKey = CacheService::trackKey($id);
+
+    $track = Cache::remember($cacheKey, CacheService::TTL_TRACKS, function () use ($id) {
+        return Track::with(['courses.topics'])->findOrFail($id);
+    });
 
     return response()->json([
         'success' => true,
-        'data'    => $tracks->items(),
-        'meta'    => [
-            'current_page' => $tracks->currentPage(),
-            'per_page'     => $tracks->perPage(),
-            'total'        => $tracks->total(),
-            'last_page'    => $tracks->lastPage(),
-        ],
+        'data'    => new TrackResource($track),
     ]);
 }
-
-    public function show($id): JsonResponse
-    {
-        $track = Track::with(['courses' => function($query) {
-            $query->orderBy('order');
-        }])->findOrFail($id);
-
-        return response()->json([
-            'success' => true,
-            'data' => $track
-        ]);
-    }
 
     public function enroll($id)
     {
@@ -63,15 +73,13 @@ class TrackController extends Controller
             ], 400);
         }
 
-        // Check if user has an active track
         $activeTrack = UserTrack::where('user_id', $user->id)
             ->where('status', 'active')
             ->first();
 
         if ($activeTrack) {
-            // Check if active track has enough progress to allow enrolling in another
             $activeProgress = $this->getTrackProgress($user->id, $activeTrack->track_id);
-            $threshold = $activeTrack->unlock_threshold; // default 25%
+            $threshold = $activeTrack->unlock_threshold; 
 
             if ($activeProgress < $threshold) {
                 return response()->json([
@@ -80,7 +88,6 @@ class TrackController extends Controller
                 ], 400);
             }
 
-            // Has enough progress — new track goes to waitlist, old stays active
             UserTrack::create([
                 'user_id' => $user->id,
                 'track_id' => $track->id,
@@ -94,7 +101,6 @@ class TrackController extends Controller
             ]);
         }
 
-        // No active track — this becomes the active one
         UserTrack::create([
             'user_id' => $user->id,
             'track_id' => $track->id,
@@ -111,9 +117,7 @@ class TrackController extends Controller
         ]);
     }
 
-    /**
-     * Switch active track (must be enrolled in both)
-     */
+ 
     public function switchTrack($id)
     {
         $user = auth()->user();
@@ -136,15 +140,12 @@ class TrackController extends Controller
             ], 400);
         }
 
-        // Deactivate current active track
         UserTrack::where('user_id', $user->id)
             ->where('status', 'active')
             ->update(['status' => 'waitlist']);
 
-        // Activate target
         $target->update(['status' => 'active']);
 
-        // Unlock first course if not already
         $track = Track::find($id);
         if ($track) {
             $this->progressService->initializeTrackProgress($user, $track);
@@ -176,9 +177,7 @@ class TrackController extends Controller
         ]);
     }
 
-    /**
-     * Calculate track progress as percentage
-     */
+
     private function getTrackProgress($userId, $trackId)
     {
         $track = Track::with('courses.topics')->find($trackId);
@@ -192,18 +191,15 @@ class TrackController extends Controller
             $totalTopics += $course->topics->count();
         }
 
-        // Score-based progress: sum of quiz scores / max possible
         $quizIds = [];
         foreach ($track->courses as $course) {
             foreach ($course->topics as $topic) {
-                // Get topic quizzes
                 $quiz = \App\Models\Quiz::where('topic_id', $topic->id)->first();
                 if ($quiz) {
                     $quizIds[] = $quiz->id;
                     $maxScore += $quiz->total_points;
                 }
             }
-            // Course final quiz
             $courseQuiz = \App\Models\Quiz::where('course_id', $course->id)->first();
             if ($courseQuiz) {
                 $quizIds[] = $courseQuiz->id;
@@ -213,7 +209,6 @@ class TrackController extends Controller
 
         if ($maxScore === 0) return 0;
 
-        // Get best scores
         foreach ($quizIds as $qid) {
             $best = UserQuizAttempt::where('user_id', $userId)
                 ->where('quiz_id', $qid)

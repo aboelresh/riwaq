@@ -59,99 +59,102 @@ class LevelAnalysisService
     }
 
     private function gatherStats(User $user): array
-    {
-        $attempts = UserQuizAttempt::where('user_id', $user->id)->get();
-        $totalAttempts = $attempts->count();
-        $passed = $attempts->where('passed', true)->count();
-        $failed = $totalAttempts - $passed;
-        $passRate = $totalAttempts > 0 ? round(($passed / $totalAttempts) * 100, 1) : 0;
-        $avgScore = $totalAttempts > 0
-            ? round($attempts->avg(fn($a) => ($a->score / max($a->max_score, 1)) * 100), 1)
-            : 0;
+{
+    $user->loadMissing([
+        'quizAttempts',
+        'topicProgress',
+        'courseProgress',
+        'tracks',
+    ]);
 
-        $recent = $attempts->sortByDesc('attempted_at')->take(10)->values();
-        $recentScores = $recent
-            ->map(fn($a) => round(($a->score / max($a->max_score, 1)) * 100, 1))
-            ->values()
-            ->toArray();
+    $attempts     = $user->quizAttempts;
+    $totalAttempts = $attempts->count();
+    $passed        = $attempts->where('passed', true)->count();
+    $failed        = $totalAttempts - $passed;
+    $passRate      = $totalAttempts > 0 ? round(($passed / $totalAttempts) * 100, 1) : 0;
+    $avgScore      = $totalAttempts > 0
+        ? round($attempts->avg(fn($a) => ($a->score / max($a->max_score, 1)) * 100), 1)
+        : 0;
 
-        $topicsViewed = UserTopicProgress::where('user_id', $user->id)
-            ->where('is_viewed', true)
-            ->count();
-        $topicsTotal = Topic::count();
+    $recentScores = $attempts->sortByDesc('attempted_at')
+        ->take(10)
+        ->map(fn($a) => round(($a->score / max($a->max_score, 1)) * 100, 1))
+        ->values()
+        ->toArray();
 
-        $coursesCompleted = UserCourseProgress::where('user_id', $user->id)
-            ->where('is_completed', true)
-            ->count();
-        $coursesStarted = UserCourseProgress::where('user_id', $user->id)
-            ->whereNotNull('started_at')
-            ->count();
+    $topicProgress = $user->topicProgress;
+    $topicsViewed  = $topicProgress->where('is_viewed', true)->count();
+    $topicsTotal   = \App\Models\Topic::count(); 
 
-        $activeUserTrack = UserTrack::with('track')
-            ->where('user_id', $user->id)
-            ->where('status', 'active')
-            ->first();
+    $courseProgress   = $user->courseProgress;
+    $coursesCompleted = $courseProgress->where('is_completed', true)->count();
+    $coursesStarted   = $courseProgress->filter(fn($c) => !is_null($c->started_at))->count();
 
-        $streak = $this->calculateStreak($user->id);
+    $activeUserTrack = \App\Models\UserTrack::with('track')
+        ->where('user_id', $user->id)
+        ->where('status', 'active')
+        ->first();
 
-        $activeDays30 = UserTopicProgress::where('user_id', $user->id)
-            ->whereNotNull('viewed_at')
-            ->where('viewed_at', '>=', now()->subDays(30))
-            ->selectRaw('DATE(viewed_at) as date')
-            ->groupBy('date')
-            ->get()
-            ->count();
+    $streak = $this->calculateStreak($user->id);
 
-        $lastActivity = UserTopicProgress::where('user_id', $user->id)
-            ->whereNotNull('viewed_at')
-            ->orderByDesc('viewed_at')
-            ->value('viewed_at');
-        $daysSinceLast = $lastActivity ? (int) now()->diffInDays($lastActivity) : null;
+    $viewedDates = $topicProgress
+        ->filter(fn($p) => !is_null($p->viewed_at) && $p->viewed_at >= now()->subDays(30))
+        ->map(fn($p) => \Carbon\Carbon::parse($p->viewed_at)->format('Y-m-d'))
+        ->unique()
+        ->count();
 
-        $assessment = AssessmentResult::where('user_id', $user->id)
-            ->latest()
-            ->first();
+    $lastActivity = $topicProgress
+        ->filter(fn($p) => !is_null($p->viewed_at))
+        ->sortByDesc('viewed_at')
+        ->first()?->viewed_at;
 
-        return [
-            'profile' => [
-                'name' => $user->name,
-                'role' => $user->role,
-                'goals' => $user->goals,
-                'member_since_days' => (int) now()->diffInDays($user->created_at),
-            ],
-            'quiz' => [
-                'total_attempts' => $totalAttempts,
-                'passed' => $passed,
-                'failed' => $failed,
-                'pass_rate' => $passRate,
-                'average_score' => $avgScore,
-                'recent_scores' => $recentScores,
-            ],
-            'content' => [
-                'topics_viewed' => $topicsViewed,
-                'topics_total' => $topicsTotal,
-                'topic_completion_rate' => $topicsTotal > 0
-                    ? round(($topicsViewed / $topicsTotal) * 100, 1)
-                    : 0,
-                'courses_completed' => $coursesCompleted,
-                'courses_started' => $coursesStarted,
-            ],
-            'track' => [
-                'current' => $activeUserTrack ? [
-                    'title' => $activeUserTrack->track?->title,
-                    'category' => $activeUserTrack->track?->category,
-                    'enrolled_days_ago' => (int) now()->diffInDays($activeUserTrack->created_at),
-                ] : null,
-                'recommended_at_assessment' => $assessment?->recommended_track,
-            ],
-            'engagement' => [
-                'current_streak_days' => $streak['current'],
-                'longest_streak_days' => $streak['longest'],
-                'active_days_last_30' => $activeDays30,
-                'days_since_last_activity' => $daysSinceLast,
-            ],
-        ];
-    }
+    $daysSinceLast = $lastActivity
+        ? (int) now()->diffInDays(\Carbon\Carbon::parse($lastActivity))
+        : null;
+
+    $assessment = \App\Models\AssessmentResult::where('user_id', $user->id)
+        ->latest()
+        ->first();
+
+    return [
+        'profile' => [
+            'name'               => $user->name,
+            'role'               => $user->role,
+            'goals'              => $user->goals,
+            'member_since_days'  => (int) now()->diffInDays($user->created_at),
+        ],
+        'quiz' => [
+            'total_attempts' => $totalAttempts,
+            'passed'         => $passed,
+            'failed'         => $failed,
+            'pass_rate'      => $passRate,
+            'average_score'  => $avgScore,
+            'recent_scores'  => $recentScores,
+        ],
+        'content' => [
+            'topics_viewed'          => $topicsViewed,
+            'topics_total'           => $topicsTotal,
+            'topic_completion_rate'  => $topicsTotal > 0
+                ? round(($topicsViewed / $topicsTotal) * 100, 1) : 0,
+            'courses_completed'      => $coursesCompleted,
+            'courses_started'        => $coursesStarted,
+        ],
+        'track' => [
+            'current' => $activeUserTrack ? [
+                'title'             => $activeUserTrack->track?->title,
+                'category'          => $activeUserTrack->track?->category,
+                'enrolled_days_ago' => (int) now()->diffInDays($activeUserTrack->created_at),
+            ] : null,
+            'recommended_at_assessment' => $assessment?->recommended_track,
+        ],
+        'engagement' => [
+            'current_streak_days'     => $streak['current'],
+            'longest_streak_days'     => $streak['longest'],
+            'active_days_last_30'     => $viewedDates,
+            'days_since_last_activity'=> $daysSinceLast,
+        ],
+    ];
+}
 
     private function calculateStreak(int $userId): array
     {

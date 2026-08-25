@@ -6,49 +6,54 @@ use App\Http\Controllers\Controller;
 use App\Models\Course;
 use App\Services\UnlockService;
 use Illuminate\Http\JsonResponse;
-
+use App\Services\CacheService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 class CourseController extends Controller
 {
     public function __construct(
         private UnlockService $unlockService
     ) {}
 
-    /**
-     * Public: list all courses with their track info and topic count.
-     */
-    public function index(): JsonResponse
+
+    public function index(Request $request): JsonResponse
 {
-    $courses = Course::with(['tracks' => fn($q) => $q->select('tracks.id', 'tracks.title')])
-        ->withCount('topics')
-        ->paginate(15);
+    $page     = $request->get('page', 1);
+    $cacheKey = CacheService::coursesKey($page);
 
-    $items = collect($courses->items())->map(fn($course) => [
-        'id'           => $course->id,
-        'title'        => $course->title,
-        'description'  => $course->description,
-        'topics_count' => $course->topics_count,
-        'track'        => $course->tracks->first()
-            ? ['id' => $course->tracks->first()->id, 'title' => $course->tracks->first()->title]
-            : null,
-    ]);
+    $data = Cache::remember($cacheKey, CacheService::TTL_COURSES, function () {
+        $courses = Course::with(['tracks' => fn($q) => $q->select('tracks.id', 'tracks.title')])
+            ->withCount('topics')
+            ->paginate(15);
 
-    return response()->json([
-        'success' => true,
-        'data'    => $items,
-        'meta'    => [
-            'current_page' => $courses->currentPage(),
-            'per_page'     => $courses->perPage(),
-            'total'        => $courses->total(),
-            'last_page'    => $courses->lastPage(),
-        ],
-    ]);
+        $items = collect($courses->items())->map(fn($course) => [
+            'id'           => $course->id,
+            'title'        => $course->title,
+            'description'  => $course->description,
+            'topics_count' => $course->topics_count,
+            'track'        => $course->tracks->first()
+                ? ['id' => $course->tracks->first()->id, 'title' => $course->tracks->first()->title]
+                : null,
+        ])->toArray();
+
+        return [
+            'data' => $items,
+            'meta' => [
+                'current_page' => $courses->currentPage(),
+                'per_page'     => $courses->perPage(),
+                'total'        => $courses->total(),
+                'last_page'    => $courses->lastPage(),
+            ],
+        ];
+    });
+
+    return response()->json(['success' => true] + $data);
 }
     public function show($id)
     {
         $user = auth()->user();
         $course = Course::with(['topics.quiz'])->findOrFail($id);
 
-        // Check if course is unlocked
         $progress = $user->courseProgress()
             ->where('course_id', $course->id)
             ->first();
@@ -60,7 +65,6 @@ class CourseController extends Controller
             ], 403);
         }
 
-        // Get topics with unlock status
         $topics = $course->topics()->orderBy('order')->get()->map(function($topic) use ($user) {
             $topicProgress = $user->topicProgress()
                 ->where('topic_id', $topic->id)
@@ -82,14 +86,12 @@ class CourseController extends Controller
             ];
         });
 
-        // Get course final quiz
         $courseFinalQuiz = $course->quizzes()
             ->where('type', 'course')
             ->first();
 
         $courseFinalQuizData = null;
         if ($courseFinalQuiz) {
-            // Check if user can take the final quiz
             $allTopicsViewed = $topics->every(fn($t) => $t['is_viewed']);
             
             $courseFinalQuizData = [

@@ -9,6 +9,8 @@ use App\Http\Resources\CourseResource;
 use App\Models\Course;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use App\Services\CacheService;
+use Illuminate\Support\Facades\Cache;
 
 class CourseController extends Controller
 {
@@ -50,7 +52,7 @@ class CourseController extends Controller
                 'order'     => 0,
             ]);
         }
-
+        CacheService::clearCourses();
         return response()->json([
             'success' => true,
             'message' => 'Course created successfully',
@@ -75,6 +77,7 @@ class CourseController extends Controller
             $course->topics()->sync($topics);
         }
 
+        CacheService::clearCourses();
         return response()->json([
             'success' => true,
             'message' => 'Course updated successfully',
@@ -86,7 +89,7 @@ class CourseController extends Controller
     {
         $course = Course::findOrFail($id);
         $course->delete();
-
+        CacheService::clearCourses();
         return response()->json([
             'success' => true,
             'message' => 'Course deleted successfully',
