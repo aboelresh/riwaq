@@ -10,7 +10,7 @@ use App\Models\Track;
 use Illuminate\Http\JsonResponse;
 use App\Services\CacheService;
 use Illuminate\Support\Facades\Cache;
-
+use App\Services\AuditLogService;
 class TrackController extends Controller
 {
    public function index(): JsonResponse
@@ -37,6 +37,8 @@ class TrackController extends Controller
             'created_by'  => auth()->id(),
         ]);
 
+        AuditLogService::created('Track', $track);
+
         if ($request->filled('course_ids')) {
             $courses = [];
             foreach ($request->course_ids as $index => $courseId) {
@@ -62,6 +64,8 @@ class TrackController extends Controller
             'title'       => $request->title,
             'description' => $request->description,
         ]);
+
+        AuditLogService::updated('Track', $track, $request->validated());
 
         if ($request->filled('course_ids')) {
             $courses = [];
@@ -93,6 +97,7 @@ class TrackController extends Controller
         }
 
         $track->delete();
+        AuditLogService::deleted('Track', $track);
         CacheService::clearTracks();
 
         return response()->json([

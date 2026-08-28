@@ -46,6 +46,7 @@ Route::get('/', fn() => response()->json([
     'message' => 'Code Master API',
     'version' => '1.0.0',
 ]));
+Route::get('/health', [\App\Http\Controllers\Api\HealthController::class, 'check']);
 
 // ─── Auth (rate limited: 5/min per IP) ────────────────────────────────────
 Route::middleware('throttle:auth')->prefix('auth')->group(function () {

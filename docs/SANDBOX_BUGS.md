@@ -134,3 +134,9 @@
 ## Observation 009 - All Admin list endpoints lack pagination 
 - Endpoints: admin/users, admin/tracks, admin/courses, admin/topics, admin/quizzes, admin/videos, admin/teams 
 - Fix: add paginate(20) to all admin list endpoints in Phase 5 
+## Bug 017 - Update Profile accepts invalid name format (numbers, special chars) 
+- Endpoint: POST /api/profile/update 
+- Issue: name field has no format validation, accepts "Ahmed123!@#" 
+- Fix: add 'name' => 'string|max:255|regex:/^[\p{L}\s]+$/u' in UpdateProfileRequest
+- Found by: teammate (independent discovery)
+- Status: OPEN
