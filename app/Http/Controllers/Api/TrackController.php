@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use App\Services\CacheService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use App\Http\Resources\TrackResource;
 
 class TrackController extends Controller
 {
@@ -22,14 +23,21 @@ class TrackController extends Controller
 
 public function index(Request $request): JsonResponse
 {
-    $page   = $request->get('page', 1);
+    $page     = $request->get('page', 1);
     $cacheKey = CacheService::tracksKey($page);
 
     $data = Cache::remember($cacheKey, CacheService::TTL_TRACKS, function () {
         $tracks = Track::with(['creator', 'courses'])->paginate(12);
 
+        // Store plain arrays in cache — avoids Resource serialization issues
         return [
-            'data' => TrackResource::collection($tracks->items())->resolve(),
+            'data' => collect($tracks->items())->map(fn($track) => [
+                'id'          => $track->id,
+                'title'       => $track->title,
+                'description' => $track->description,
+                'created_by'  => $track->created_by,
+                'created_at'  => $track->created_at?->toDateTimeString(),
+            ])->toArray(),
             'meta' => [
                 'current_page' => $tracks->currentPage(),
                 'per_page'     => $tracks->perPage(),
@@ -40,7 +48,7 @@ public function index(Request $request): JsonResponse
     });
 
     return response()->json(['success' => true] + $data);
-}
+}           
 
 public function show($id): JsonResponse
 {

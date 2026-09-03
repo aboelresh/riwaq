@@ -129,11 +129,11 @@ Route::middleware(['auth:api', 'throttle:api'])->group(function () {
 
     // Notifications
     Route::prefix('notifications')->group(function () {
-        Route::get('/',                  [NotificationController::class, 'index']);
-        Route::get('/unread-count',      [NotificationController::class, 'unreadCount']);
-        Route::post('/read-all',         [NotificationController::class, 'markAllAsRead']);
-        Route::post('/{id}/read',        [NotificationController::class, 'markAsRead']);
-    });
+    Route::get('/',              [NotificationController::class, 'index']);
+    Route::get('/unread-count',  [NotificationController::class, 'unreadCount']);
+    Route::post('/read-all',     [NotificationController::class, 'markAllRead']);
+    Route::post('/{id}/read',    [NotificationController::class, 'markRead']);
+});
 
     // Teams
     Route::prefix('teams')->group(function () {
