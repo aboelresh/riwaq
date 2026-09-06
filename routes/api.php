@@ -61,6 +61,7 @@ Route::middleware('throttle:auth')->prefix('auth')->group(function () {
         Route::post('logout',        [LogoutController::class, 'logout']);
         Route::post('verify',        [VerificationController::class, 'verify']);
         Route::post('verify/resend', [VerificationController::class, 'resend']);
+        Route::post('switch-organization', [\App\Http\Controllers\Api\Auth\SwitchOrganizationController::class, 'switch']);
     });
 });
 
