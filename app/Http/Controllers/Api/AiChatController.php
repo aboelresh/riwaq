@@ -11,71 +11,99 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
+
 class AiChatController extends Controller
 {
-    public function chat(AiChatRequest $request): JsonResponse
-    {
-        $validated = $request->validated();
-        $user      = auth()->user();
+public function chat(AiChatRequest $request): JsonResponse
+{
+    $validated = $request->validated();
+    $user      = auth()->user();
 
-        // Rate limiting: 30 messages per hour per user
-        $cacheKey = "ai_chat_limit:{$user->id}";
-        $count    = Cache::get($cacheKey, 0);
-        if ($count >= 30) {
+    // Rate limiting: 30 messages per hour per user
+    $cacheKey = "ai_chat_limit:{$user->id}";
+    $count    = Cache::get($cacheKey, 0);
+    if ($count >= 30) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Rate limit exceeded. Try again later.',
+        ], 429);
+    }
+    Cache::put($cacheKey, $count + 1, 3600);
+
+    // Entitlement check — plan-level AI limit (monthly)
+    $org = \App\SaaS\TenantContext::isResolved()
+        ? \App\SaaS\TenantContext::current()
+        : null;
+
+    if ($org) {
+        $result = \App\SaaS\EntitlementService::canUseAI($org);
+        if (!$result->allowed) {
             return response()->json([
                 'success' => false,
-                'message' => 'Rate limit exceeded. Try again later.',
-            ], 429);
-        }
-        Cache::put($cacheKey, $count + 1, 3600);
-
-        // Build context
-        $topicContext = '';
-        if ($validated['topic_id'] ?? null) {
-            $topic = Topic::find($validated['topic_id']);
-            if ($topic) {
-                $topicContext = "\n\nCurrent Topic: {$topic->title}\nType: {$topic->type}\nContent (summary): "
-                    . mb_substr(strip_tags($topic->content ?? ''), 0, 2000);
-            }
-        }
-
-        $progress     = UserTopicProgress::where('user_id', $user->id)->where('is_viewed', true)->count();
-        $systemPrompt = $this->buildSystemPrompt($user, $topicContext, $progress);
-        $provider     = config('services.ai.provider', env('AI_PROVIDER', 'gemini'));
-
-        try {
-            $reply = match ($provider) {
-                'openai' => $this->callOpenAI($systemPrompt, $validated),
-                'claude' => $this->callClaude($systemPrompt, $validated),
-                'gemini' => $this->callGemini($systemPrompt, $validated),
-                'groq'   => $this->callGroq($systemPrompt, $validated),
-                default  => $this->callGroq($systemPrompt, $validated),
-            };
-
-            return response()->json([
-                'success' => true,
-                'data'    => ['reply' => $reply],
-            ]);
-        } catch (\Exception $e) {
-            // Bug 005 Fix: log internally, never expose exception message to client
-            Log::error('AI Chat Error', [
-                'user_id'  => $user->id,
-                'provider' => $provider,
-                'error'    => $e->getMessage(),
-            ]);
-
-            $reply = $this->fallbackResponse($validated['message'], $topicContext);
-
-            return response()->json([
-                'success' => true,
-                'data'    => [
-                    'reply'    => $reply,
-                    'fallback' => true,
-                    // 'error' intentionally removed — Bug 005 fix
-                ],
-            ]);
+                'message' => $result->reason,
+            ], 403);
         }
     }
+
+    // Build context
+    $topicContext = '';
+    if ($validated['topic_id'] ?? null) {
+        $topic = Topic::find($validated['topic_id']);
+        if ($topic) {
+            $topicContext = "\n\nCurrent Topic: {$topic->title}\nType: {$topic->type}\nContent (summary): "
+                . mb_substr(strip_tags($topic->content ?? ''), 0, 2000);
+        }
+    }
+
+    $progress     = UserTopicProgress::where('user_id', $user->id)->where('is_viewed', true)->count();
+    $systemPrompt = $this->buildSystemPrompt($user, $topicContext, $progress);
+    $provider     = config('services.ai.provider', env('AI_PROVIDER', 'gemini'));
+    $wasFallback  = false;
+
+    try {
+        $reply = match ($provider) {
+            'openai' => $this->callOpenAI($systemPrompt, $validated),
+            'claude' => $this->callClaude($systemPrompt, $validated),
+            'gemini' => $this->callGemini($systemPrompt, $validated),
+            'groq'   => $this->callGroq($systemPrompt, $validated),
+            default  => $this->callGroq($systemPrompt, $validated),
+        };
+
+    } catch (\Exception $e) {
+        // Bug 005 Fix: log internally, never expose exception message to client
+        Log::error('AI Chat Error', [
+            'user_id'  => $user->id,
+            'provider' => $provider,
+            'error'    => $e->getMessage(),
+        ]);
+
+        $reply       = $this->fallbackResponse($validated['message'], $topicContext);
+        $wasFallback = true;
+    }
+
+    // Log AI usage for tenant metering — runs for BOTH success and fallback
+    if ($org) {
+        \App\Models\AiUsageLog::create([
+            'organization_id' => $org->id,
+            'user_id'         => $user->id,
+            'feature'         => 'chat',
+            'tokens_used'     => 0,
+            'provider'        => $provider,
+            'was_fallback'    => $wasFallback,
+            'used_at'         => now(),
+        ]);
+    }
+
+    $response = ['reply' => $reply];
+    if ($wasFallback) {
+        $response['fallback'] = true;
+    }
+
+    return response()->json([
+        'success' => true,
+        'data'    => $response,
+    ]);
+}
 
     private function buildSystemPrompt($user, $topicContext, $viewedTopics): string
     {

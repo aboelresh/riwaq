@@ -31,6 +31,20 @@ class CourseController extends Controller
 }
     public function store(StoreCourseRequest $request): JsonResponse
     {
+         $org    = \App\SaaS\TenantContext::isResolved()
+        ? \App\SaaS\TenantContext::current()
+        : null;
+
+        if ($org) {
+        $result = \App\SaaS\EntitlementService::canCreateCourse($org);
+        if (!$result->allowed) {
+            return response()->json([
+                'success' => false,
+                'message' => $result->reason,
+            ], 403);
+        }
+    }
+
         $course = Course::create([
             'title'       => $request->title,
             'description' => $request->description,

@@ -31,6 +31,19 @@ class TrackController extends Controller
 
     public function store(StoreTrackRequest $request): JsonResponse
     {
+         $org = \App\SaaS\TenantContext::isResolved()
+        ? \App\SaaS\TenantContext::current()
+        : null;
+
+        if ($org) {
+        $result = \App\SaaS\EntitlementService::canCreateTrack($org);
+        if (!$result->allowed) {
+            return response()->json([
+                'success' => false,
+                'message' => $result->reason,
+            ], 403);
+        }
+    }
         $track = Track::create([
             'title'       => $request->title,
             'description' => $request->description,

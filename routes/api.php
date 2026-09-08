@@ -34,6 +34,7 @@ use App\Http\Controllers\Api\TopicController;
 use App\Http\Controllers\Api\TrackController;
 use App\Http\Controllers\Api\VideoStreamController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\Organization\OrganizationController;
 
 // ── API v1 wrapper ──────────────────────────────────────────────────────────
 // All routes are under /api/v1/ prefix for future versioning support.
@@ -134,6 +135,16 @@ Route::middleware(['auth:api', 'throttle:api'])->group(function () {
     Route::get('/unread-count',  [NotificationController::class, 'unreadCount']);
     Route::post('/read-all',     [NotificationController::class, 'markAllRead']);
     Route::post('/{id}/read',    [NotificationController::class, 'markRead']);
+});
+    // ── Organization Management ────────────────────────────────────
+    Route::prefix('organization')->group(function () {
+    Route::get('/',                         [OrganizationController::class, 'show']);
+    Route::put('/',                         [OrganizationController::class, 'update']);
+    Route::get('/members',                  [OrganizationController::class, 'members']);
+    Route::post('/members/invite',          [OrganizationController::class, 'invite']);
+    Route::put('/members/{userId}/role',    [OrganizationController::class, 'updateRole']);
+    Route::delete('/members/{userId}',      [OrganizationController::class, 'removeMember']);
+    Route::get('/usage',                    [OrganizationController::class, 'usage']);
 });
 
     // Teams
