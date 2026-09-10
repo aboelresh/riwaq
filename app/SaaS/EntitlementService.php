@@ -18,34 +18,40 @@ use Carbon\Carbon;
 class EntitlementService
 {
     public static function canCreateCourse(Organization $org): EntitlementResult
-    {
-        $plan    = $org->plan;
-        $current = $org->courses()->withoutTenantScope()
-                       ->where('organization_id', $org->id)->count();
+{
+    $plan = $org->plan;
+    if (!$plan) return EntitlementResult::allowed();
 
-        if ($plan && $current >= $plan->max_courses) {
-            return EntitlementResult::denied(
-                "Course limit reached ({$current}/{$plan->max_courses}). Upgrade your plan."
-            );
-        }
+    $current = \App\Models\Course::withoutTenantScope()
+        ->where('organization_id', $org->id)
+        ->count();
 
-        return EntitlementResult::allowed();
+    if ($current >= $plan->max_courses) {
+        return EntitlementResult::denied(
+            "Course limit reached ({$current}/{$plan->max_courses}). Upgrade your plan."
+        );
     }
 
-    public static function canCreateTrack(Organization $org): EntitlementResult
-    {
-        $plan    = $org->plan;
-        $current = $org->tracks()->withoutTenantScope()
-                       ->where('organization_id', $org->id)->count();
+    return EntitlementResult::allowed();
+}
 
-        if ($plan && $current >= $plan->max_tracks) {
-            return EntitlementResult::denied(
-                "Track limit reached ({$current}/{$plan->max_tracks}). Upgrade your plan."
-            );
-        }
+public static function canCreateTrack(Organization $org): EntitlementResult
+{
+    $plan = $org->plan;
+    if (!$plan) return EntitlementResult::allowed();
 
-        return EntitlementResult::allowed();
+    $current = \App\Models\Track::withoutTenantScope()
+        ->where('organization_id', $org->id)
+        ->count();
+
+    if ($current >= $plan->max_tracks) {
+        return EntitlementResult::denied(
+            "Track limit reached ({$current}/{$plan->max_tracks}). Upgrade your plan."
+        );
     }
+
+    return EntitlementResult::allowed();
+}
 
     public static function canUseAI(Organization $org): EntitlementResult
     {
