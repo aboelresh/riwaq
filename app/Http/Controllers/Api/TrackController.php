@@ -3,228 +3,154 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\TrackResource;
 use App\Models\Track;
 use App\Models\UserTrack;
-use App\Models\UserQuizAttempt;
-use App\Services\UnlockService;
-use App\Services\ProgressService;
-use Illuminate\Http\JsonResponse;
 use App\Services\CacheService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use App\Http\Resources\TrackResource;
+use OpenApi\Attributes as OA;
 
 class TrackController extends Controller
 {
-    public function __construct(
-        private UnlockService $unlockService,
-        private ProgressService $progressService
-    ) {}
-
-public function index(Request $request): JsonResponse
-{
-    $page     = $request->get('page', 1);
-    $cacheKey = CacheService::tracksKey($page);
-
-    $data = Cache::remember($cacheKey, CacheService::TTL_TRACKS, function () {
-        $tracks = Track::with(['creator', 'courses'])->paginate(12);
-
-        // Store plain arrays in cache — avoids Resource serialization issues
-        return [
-            'data' => collect($tracks->items())->map(fn($track) => [
-                'id'          => $track->id,
-                'title'       => $track->title,
-                'description' => $track->description,
-                'created_by'  => $track->created_by,
-                'created_at'  => $track->created_at?->toDateTimeString(),
-            ])->toArray(),
-            'meta' => [
-                'current_page' => $tracks->currentPage(),
-                'per_page'     => $tracks->perPage(),
-                'total'        => $tracks->total(),
-                'last_page'    => $tracks->lastPage(),
-            ],
-        ];
-    });
-
-    return response()->json(['success' => true] + $data);
-}           
-
-public function show($id): JsonResponse
-{
-    $cacheKey = CacheService::trackKey($id);
-
-    $track = Cache::remember($cacheKey, CacheService::TTL_TRACKS, function () use ($id) {
-        return Track::with(['courses.topics'])->findOrFail($id);
-    });
-
-    return response()->json([
-        'success' => true,
-        'data'    => new TrackResource($track),
-    ]);
-}
-
-    public function enroll($id)
+    #[OA\Get(
+        path: '/tracks',
+        summary: 'List all tracks - public, paginated, cached 1h',
+        tags: ['Tracks'],
+        parameters: [
+            new OA\Parameter(name: 'page', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 1)),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Paginated tracks list'),
+        ]
+    )]
+    public function index(Request $request): JsonResponse
     {
-        $user = auth()->user();
+        $page     = $request->get('page', 1);
+        $cacheKey = CacheService::tracksKey($page);
+
+        $data = Cache::remember($cacheKey, CacheService::TTL_TRACKS, function () {
+            $tracks = Track::with(['creator', 'courses'])->paginate(12);
+
+            return [
+                'data' => collect($tracks->items())->map(fn($track) => [
+                    'id'          => $track->id,
+                    'title'       => $track->title,
+                    'description' => $track->description,
+                    'created_by'  => $track->created_by,
+                    'created_at'  => $track->created_at?->toDateTimeString(),
+                ])->toArray(),
+                'meta' => [
+                    'current_page' => $tracks->currentPage(),
+                    'per_page'     => $tracks->perPage(),
+                    'total'        => $tracks->total(),
+                    'last_page'    => $tracks->lastPage(),
+                ],
+            ];
+        });
+
+        return response()->json(['success' => true] + $data);
+    }
+
+    #[OA\Get(
+        path: '/tracks/{id}',
+        summary: 'Show track details with courses',
+        tags: ['Tracks'],
+        security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Track with nested courses'),
+            new OA\Response(response: 404, description: 'Track not found'),
+        ]
+    )]
+    public function show($id): JsonResponse
+    {
+        $cacheKey = CacheService::trackKey($id);
+
+        $track = Cache::remember($cacheKey, CacheService::TTL_TRACKS, function () use ($id) {
+            return Track::with(['courses.topics'])->findOrFail($id);
+        });
+
+        return response()->json([
+            'success' => true,
+            'data'    => new TrackResource($track),
+        ]);
+    }
+
+    #[OA\Post(
+        path: '/tracks/{id}/enroll',
+        summary: 'Enroll in a track',
+        tags: ['Tracks'],
+        security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Enrolled successfully'),
+            new OA\Response(response: 400, description: 'Already enrolled or threshold not met'),
+            new OA\Response(response: 401, description: 'Unauthenticated'),
+        ]
+    )]
+    public function enroll($id): JsonResponse
+    {
+        $user  = auth()->user();
         $track = Track::findOrFail($id);
 
-        // Already enrolled in this track?
-        $existing = UserTrack::where('user_id', $user->id)
-            ->where('track_id', $track->id)
-            ->first();
-
-        if ($existing) {
+        if ($user->tracks()->where('track_id', $id)->exists()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Already enrolled in this track'
+                'message' => 'Already enrolled in this track.',
             ], 400);
         }
 
-        $activeTrack = UserTrack::where('user_id', $user->id)
-            ->where('status', 'active')
-            ->first();
+        $activeTrack = $user->tracks()->where('status', 'active')->first();
+        if ($activeTrack && $activeTrack->id !== (int) $id) {
+            $activeProgress = UserTrack::where('user_id', $user->id)
+                ->where('track_id', $activeTrack->id)->first();
 
-        if ($activeTrack) {
-            $activeProgress = $this->getTrackProgress($user->id, $activeTrack->track_id);
-            $threshold = $activeTrack->unlock_threshold; 
-
-            if ($activeProgress < $threshold) {
+            if (!$activeProgress || $activeProgress->progress_percentage < 25) {
                 return response()->json([
                     'success' => false,
-                    'message' => "You need to reach {$threshold}% in your current track before enrolling in another. Current progress: {$activeProgress}%"
+                    'message' => 'Complete at least 25% of your current track first.',
                 ], 400);
             }
-
-            UserTrack::create([
-                'user_id' => $user->id,
-                'track_id' => $track->id,
-                'status' => 'waitlist',
-                'started_at' => now(),
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Added to waitlist. You can switch to this track from your dashboard.'
-            ]);
         }
 
         UserTrack::create([
-            'user_id' => $user->id,
-            'track_id' => $track->id,
-            'status' => 'active',
-            'started_at' => now(),
+            'user_id'  => $user->id,
+            'track_id' => $id,
+            'status'   => 'active',
         ]);
-
-        $this->progressService->initializeTrackProgress($user, $track);
-        $this->unlockService->unlockFirstCourseInTrack($user, $track);
 
         return response()->json([
             'success' => true,
-            'message' => 'Enrolled successfully'
+            'message' => 'Successfully enrolled in: ' . $track->title,
         ]);
     }
 
- 
-    public function switchTrack($id)
+    #[OA\Get(
+        path: '/tracks/my-tracks',
+        summary: 'Get enrolled tracks for authenticated user',
+        tags: ['Tracks'],
+        security: [['bearerAuth' => []]],
+        responses: [
+            new OA\Response(response: 200, description: 'Enrolled tracks with progress'),
+            new OA\Response(response: 401, description: 'Unauthenticated'),
+        ]
+    )]
+    public function myTracks(): JsonResponse
     {
-        $user = auth()->user();
-
-        $target = UserTrack::where('user_id', $user->id)
-            ->where('track_id', $id)
-            ->first();
-
-        if (!$target) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Not enrolled in this track'
-            ], 400);
-        }
-
-        if ($target->status === 'active') {
-            return response()->json([
-                'success' => false,
-                'message' => 'This track is already active'
-            ], 400);
-        }
-
-        UserTrack::where('user_id', $user->id)
-            ->where('status', 'active')
-            ->update(['status' => 'waitlist']);
-
-        $target->update(['status' => 'active']);
-
-        $track = Track::find($id);
-        if ($track) {
-            $this->progressService->initializeTrackProgress($user, $track);
-            $this->unlockService->unlockFirstCourseInTrack($user, $track);
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Switched to this track'
-        ]);
-    }
-
-    public function myTracks()
-    {
-        $user = auth()->user();
-
+        $user   = auth()->user();
         $tracks = $user->tracks()
-            ->withPivot('status', 'unlock_threshold', 'started_at', 'completed_at')
-            ->with(['courses' => function($query) use ($user) {
-                $query->with(['userProgress' => function($q) use ($user) {
-                    $q->where('user_id', $user->id);
-                }]);
-            }])
+            ->withPivot('status', 'progress_percentage', 'started_at', 'completed_at')
             ->get();
 
         return response()->json([
             'success' => true,
-            'data' => $tracks
+            'data'    => $tracks,
         ]);
-    }
-
-
-    private function getTrackProgress($userId, $trackId)
-    {
-        $track = Track::with('courses.topics')->find($trackId);
-        if (!$track) return 0;
-
-        $totalTopics = 0;
-        $totalScore = 0;
-        $maxScore = 0;
-
-        foreach ($track->courses as $course) {
-            $totalTopics += $course->topics->count();
-        }
-
-        $quizIds = [];
-        foreach ($track->courses as $course) {
-            foreach ($course->topics as $topic) {
-                $quiz = \App\Models\Quiz::where('topic_id', $topic->id)->first();
-                if ($quiz) {
-                    $quizIds[] = $quiz->id;
-                    $maxScore += $quiz->total_points;
-                }
-            }
-            $courseQuiz = \App\Models\Quiz::where('course_id', $course->id)->first();
-            if ($courseQuiz) {
-                $quizIds[] = $courseQuiz->id;
-                $maxScore += $courseQuiz->total_points;
-            }
-        }
-
-        if ($maxScore === 0) return 0;
-
-        foreach ($quizIds as $qid) {
-            $best = UserQuizAttempt::where('user_id', $userId)
-                ->where('quiz_id', $qid)
-                ->where('passed', true)
-                ->max('score');
-            $totalScore += ($best ?? 0);
-        }
-
-        return min(100, round(($totalScore / $maxScore) * 100));
     }
 }

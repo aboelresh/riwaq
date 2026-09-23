@@ -2,22 +2,85 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use OpenApi\Attributes as OA;
 
-class HealthController extends Controller
+
+class HealthController extends BaseController
 {
+    #[OA\Get(
+        path: '/health',
+        summary: 'System health check',
+        description: 'Checks database, cache, and storage. Returns 503 if any system is down.',
+        tags: ['System'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'All systems operational',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'healthy', type: 'boolean', example: true),
+                        new OA\Property(
+                            property: 'checks',
+                            type: 'object',
+                            properties: [
+                                new OA\Property(
+                                    property: 'database',
+                                    type: 'object',
+                                    properties: [
+                                        new OA\Property(property: 'status', type: 'string', example: 'ok'),
+                                        new OA\Property(property: 'driver', type: 'string', example: 'sqlite'),
+                                    ]
+                                ),
+                                new OA\Property(
+                                    property: 'cache',
+                                    type: 'object',
+                                    properties: [
+                                        new OA\Property(property: 'status', type: 'string', example: 'ok'),
+                                        new OA\Property(property: 'driver', type: 'string', example: 'file'),
+                                    ]
+                                ),
+                                new OA\Property(
+                                    property: 'storage',
+                                    type: 'object',
+                                    properties: [
+                                        new OA\Property(property: 'status', type: 'string', example: 'ok'),
+                                    ]
+                                ),
+                                new OA\Property(
+                                    property: 'app',
+                                    type: 'object',
+                                    properties: [
+                                        new OA\Property(property: 'status', type: 'string', example: 'ok'),
+                                        new OA\Property(property: 'environment', type: 'string', example: 'local'),
+                                        new OA\Property(property: 'php', type: 'string', example: '8.2.12'),
+                                        new OA\Property(property: 'laravel', type: 'string', example: '12.0.0'),
+                                        new OA\Property(property: 'version', type: 'string', example: '1.0.0'),
+                                    ]
+                                ),
+                            ]
+                        ),
+                        new OA\Property(property: 'time', type: 'string', format: 'date-time'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 503, description: 'One or more systems degraded'),
+        ]
+    )]
+
+
     public function check(): JsonResponse
     {
-        $checks = [];
+        $checks  = [];
         $healthy = true;
 
         // Database check
         try {
             DB::connection()->getPdo();
-            $dbTime = DB::selectOne('SELECT 1 as ok');
+            DB::selectOne('SELECT 1 as ok');
             $checks['database'] = ['status' => 'ok', 'driver' => DB::getDriverName()];
         } catch (\Throwable $e) {
             $checks['database'] = ['status' => 'fail', 'error' => 'Cannot connect'];

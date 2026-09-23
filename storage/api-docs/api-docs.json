@@ -1,0 +1,492 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Code Master API",
+        "description": "Adaptive Learning Platform - Multi-tenant SaaS",
+        "contact": {
+            "email": "dev@codemaster.com"
+        },
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "http://127.0.0.1:8001/api/v1",
+            "description": "Local Sandbox"
+        },
+        {
+            "url": "https://api.codemaster.com/api/v1",
+            "description": "Production"
+        }
+    ],
+    "paths": {
+        "/admin/tracks": {
+            "get": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "List all tracks",
+                "operationId": "cf3593b501726e9cd4bd526b2ce3a87f",
+                "responses": {
+                    "200": {
+                        "description": "Tracks list"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Create a track",
+                "operationId": "90f016834570afa4ff97cb5bfd1ff3d5",
+                "responses": {
+                    "201": {
+                        "description": "Track created"
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/admin/tracks/{id}": {
+            "put": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Update a track",
+                "operationId": "0b67920d81007c381bc1df08e9784754",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Track updated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Delete a track",
+                "operationId": "17ca5d44d82f5a0f8740ca0ce71baf80",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Track deleted"
+                    },
+                    "409": {
+                        "description": "Cannot delete - enrolled users exist"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/auth/login": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Login and receive JWT token",
+                "operationId": "79470e1e4d9222065432491a36cad427",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "email",
+                                    "password"
+                                ],
+                                "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "example": "admin@codemaster.com"
+                                    },
+                                    "password": {
+                                        "type": "string",
+                                        "format": "password",
+                                        "example": "password"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Login successful",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "token": {
+                                            "type": "string"
+                                        },
+                                        "token_type": {
+                                            "type": "string",
+                                            "example": "bearer"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid credentials"
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                }
+            }
+        },
+        "/auth/register": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Register a new learner account",
+                "operationId": "26ae0669f4095ae42d4227211d6bb079",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "name",
+                                    "email",
+                                    "password",
+                                    "password_confirmation"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "example": "Ahmed Mohamed"
+                                    },
+                                    "username": {
+                                        "type": "string",
+                                        "example": "ahmed_dev",
+                                        "nullable": true
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email"
+                                    },
+                                    "password": {
+                                        "type": "string",
+                                        "format": "password",
+                                        "minLength": 8
+                                    },
+                                    "password_confirmation": {
+                                        "type": "string",
+                                        "format": "password"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Registered successfully - check email for verification code"
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "tags": [
+                    "System"
+                ],
+                "summary": "System health check",
+                "description": "Checks database, cache, and storage. Returns 503 if any system is down.",
+                "operationId": "4931a93c4d00de87f27eb43f3a42b17c",
+                "responses": {
+                    "200": {
+                        "description": "All systems operational",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "healthy": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "checks": {
+                                            "properties": {
+                                                "database": {
+                                                    "properties": {
+                                                        "status": {
+                                                            "type": "string",
+                                                            "example": "ok"
+                                                        },
+                                                        "driver": {
+                                                            "type": "string",
+                                                            "example": "sqlite"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "cache": {
+                                                    "properties": {
+                                                        "status": {
+                                                            "type": "string",
+                                                            "example": "ok"
+                                                        },
+                                                        "driver": {
+                                                            "type": "string",
+                                                            "example": "file"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "storage": {
+                                                    "properties": {
+                                                        "status": {
+                                                            "type": "string",
+                                                            "example": "ok"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "app": {
+                                                    "properties": {
+                                                        "status": {
+                                                            "type": "string",
+                                                            "example": "ok"
+                                                        },
+                                                        "environment": {
+                                                            "type": "string",
+                                                            "example": "local"
+                                                        },
+                                                        "php": {
+                                                            "type": "string",
+                                                            "example": "8.2.12"
+                                                        },
+                                                        "laravel": {
+                                                            "type": "string",
+                                                            "example": "12.0.0"
+                                                        },
+                                                        "version": {
+                                                            "type": "string",
+                                                            "example": "1.0.0"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "time": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "One or more systems degraded"
+                    }
+                }
+            }
+        },
+        "/tracks": {
+            "get": {
+                "tags": [
+                    "Tracks"
+                ],
+                "summary": "List all tracks - public, paginated, cached 1h",
+                "operationId": "ad1baacaa4dfb415363918e8e58e0833",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated tracks list"
+                    }
+                }
+            }
+        },
+        "/tracks/{id}": {
+            "get": {
+                "tags": [
+                    "Tracks"
+                ],
+                "summary": "Show track details with courses",
+                "operationId": "8fc9f230b412ad82102ca0395758fc19",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Track with nested courses"
+                    },
+                    "404": {
+                        "description": "Track not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/tracks/{id}/enroll": {
+            "post": {
+                "tags": [
+                    "Tracks"
+                ],
+                "summary": "Enroll in a track",
+                "operationId": "a7183eb676f708550d3f561935b02f86",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Enrolled successfully"
+                    },
+                    "400": {
+                        "description": "Already enrolled or threshold not met"
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/tracks/my-tracks": {
+            "get": {
+                "tags": [
+                    "Tracks"
+                ],
+                "summary": "Get enrolled tracks for authenticated user",
+                "operationId": "6c59d95436c4c8222af025fc8622e10a",
+                "responses": {
+                    "200": {
+                        "description": "Enrolled tracks with progress"
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        }
+    },
+    "components": {
+        "securitySchemes": {
+            "bearerAuth": {
+                "type": "http",
+                "bearerFormat": "JWT",
+                "scheme": "bearer"
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Auth",
+            "description": "Authentication"
+        },
+        {
+            "name": "Tracks",
+            "description": "Learning tracks"
+        },
+        {
+            "name": "Admin",
+            "description": "Admin-only endpoints"
+        },
+        {
+            "name": "System",
+            "description": "Health check"
+        }
+    ]
+}

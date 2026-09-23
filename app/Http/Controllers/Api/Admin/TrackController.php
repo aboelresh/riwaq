@@ -11,8 +11,10 @@ use Illuminate\Http\JsonResponse;
 use App\Services\CacheService;
 use Illuminate\Support\Facades\Cache;
 use App\Services\AuditLogService;
+use OpenApi\Attributes as OA;
 class TrackController extends Controller
 {
+    #[OA\Get(path: '/admin/tracks', summary: 'List all tracks', tags: ['Admin'], security: [['bearerAuth' => []]], responses: [new OA\Response(response: 200, description: 'Tracks list'), new OA\Response(response: 403, description: 'Forbidden')])]
    public function index(): JsonResponse
 {
     $tracks = Track::with(['creator', 'courses'])->paginate(20);
@@ -28,6 +30,7 @@ class TrackController extends Controller
         ],
     ]);
 }
+    #[OA\Post(path: '/admin/tracks', summary: 'Create a track', tags: ['Admin'], security: [['bearerAuth' => []]], responses: [new OA\Response(response: 201, description: 'Track created'), new OA\Response(response: 422, description: 'Validation error')])]
 
     public function store(StoreTrackRequest $request): JsonResponse
     {
@@ -69,6 +72,7 @@ class TrackController extends Controller
         ], 201);
     }
 
+    #[OA\Put(path: '/admin/tracks/{id}', summary: 'Update a track', tags: ['Admin'], security: [['bearerAuth' => []]], parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))], responses: [new OA\Response(response: 200, description: 'Track updated')])]
     public function update(UpdateTrackRequest $request, $id): JsonResponse
     {
         $track = Track::findOrFail($id);
@@ -97,6 +101,7 @@ class TrackController extends Controller
         ]);
     }
 
+    #[OA\Delete(path: '/admin/tracks/{id}', summary: 'Delete a track', tags: ['Admin'], security: [['bearerAuth' => []]], parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))], responses: [new OA\Response(response: 200, description: 'Track deleted'), new OA\Response(response: 409, description: 'Cannot delete - enrolled users exist')])]
     public function destroy($id): JsonResponse
     {
         $track = Track::findOrFail($id);

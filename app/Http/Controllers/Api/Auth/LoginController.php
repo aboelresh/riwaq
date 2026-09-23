@@ -9,12 +9,42 @@ use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Hash;
+use OpenApi\Attributes as OA;
 
 class LoginController extends Controller
 {
+    #[OA\Post(
+        path: '/auth/login',
+        summary: 'Login and receive JWT token',
+        tags: ['Auth'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['email', 'password'],
+                properties: [
+                    new OA\Property(property: 'email',    type: 'string', format: 'email',    example: 'admin@codemaster.com'),
+                    new OA\Property(property: 'password', type: 'string', format: 'password', example: 'password'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Login successful',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success',    type: 'boolean', example: true),
+                        new OA\Property(property: 'token',      type: 'string'),
+                        new OA\Property(property: 'token_type', type: 'string',  example: 'bearer'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Invalid credentials'),
+            new OA\Response(response: 422, description: 'Validation error'),
+        ]
+    )]
     public function login(LoginRequest $request): JsonResponse
     {
-        // Case-insensitive email lookup (Bug002 fix)
         $user = User::whereRaw('LOWER(email) = ?', [
             strtolower(trim($request->email))
         ])->first();
@@ -26,37 +56,29 @@ class LoginController extends Controller
             ], 401);
         }
 
-        // Resolve user's organizations
         $memberships = Organization::whereHas('users', fn($q) =>
             $q->where('user_id', $user->id)->where('status', 'active')
         )->get();
 
-        // Single License Mode — always org #1
         if (config('app.single_license_mode', false)) {
             $org   = Organization::find(config('app.single_license_organization_id', 1));
             $token = auth('api')->claims(['org_id' => $org?->id])->login($user);
-
-            return $this->tokenResponse($user, $token, $org, $memberships);
+            return $this->tokenResponse($user, $token, $org);
         }
 
-        // Single organization — auto-select
         if ($memberships->count() === 1) {
             $org   = $memberships->first();
             $token = auth('api')->claims(['org_id' => $org->id])->login($user);
-
-            return $this->tokenResponse($user, $token, $org, $memberships);
+            return $this->tokenResponse($user, $token, $org);
         }
 
-        // Multiple organizations — issue token WITHOUT org_id
-        // Client must call POST /auth/switch-organization to get scoped token
         if ($memberships->count() > 1) {
             $token = auth('api')->login($user);
-
             return response()->json([
-                'success'       => true,
-                'message'       => 'Login successful. Please select an organization.',
+                'success'                => true,
+                'message'                => 'Please select an organization.',
                 'requires_org_selection' => true,
-                'data'          => [
+                'data'                   => [
                     'user'          => new UserResource($user),
                     'token'         => $token,
                     'token_type'    => 'bearer',
@@ -64,31 +86,26 @@ class LoginController extends Controller
                         'id'   => $o->id,
                         'name' => $o->name,
                         'slug' => $o->slug,
-                        'logo' => $o->logo,
-                        'role' => $o->users()
-                                    ->where('user_id', $user->id)
-                                    ->first()?->pivot->role,
+                        'role' => $o->users()->where('user_id', $user->id)->first()?->pivot->role,
                     ]),
                 ],
             ]);
         }
 
-        // No organization membership — system admin or unassigned user
         $token = auth('api')->login($user);
-
-        return $this->tokenResponse($user, $token, null, $memberships);
+        return $this->tokenResponse($user, $token, null);
     }
 
-    private function tokenResponse(User $user, string $token, ?Organization $org, $memberships): JsonResponse
+    private function tokenResponse(User $user, string $token, ?Organization $org): JsonResponse
     {
         return response()->json([
-            'success'    => true,
-            'message'    => 'Login successful',
-            'data'       => [
-                'user'          => new UserResource($user),
-                'token'         => $token,
-                'token_type'    => 'bearer',
-                'organization'  => $org ? [
+            'success' => true,
+            'message' => 'Login successful',
+            'data'    => [
+                'user'         => new UserResource($user),
+                'token'        => $token,
+                'token_type'   => 'bearer',
+                'organization' => $org ? [
                     'id'   => $org->id,
                     'name' => $org->name,
                     'slug' => $org->slug,
