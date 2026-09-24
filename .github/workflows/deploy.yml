@@ -20,30 +20,11 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
+                   script: |
             cd /var/www/codemaster
-
-            # Pull latest code
             git pull origin main
-
-            # Install production dependencies only
             composer install --no-dev --optimize-autoloader --no-interaction
-
-            # Run migrations (safe — only new ones)
-            php artisan migrate --force
-
-            # Cache config and routes for performance
-            php artisan config:cache
-            php artisan route:cache
-            php artisan view:cache
-
-            # Clear old caches
-            php artisan cache:clear
-
-            # Restart queue workers
+            php artisan app:setup-production
             php artisan queue:restart
-
-            # Restart PHP-FPM
             sudo systemctl reload php8.2-fpm
-
-            echo "✔️Deployment complete at $(date)"
+            echo "Deployment complete at $(date)"

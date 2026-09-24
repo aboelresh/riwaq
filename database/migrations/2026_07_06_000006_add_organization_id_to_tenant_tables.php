@@ -43,15 +43,17 @@ return new class extends Migration
         }
     }
 
-    public function down(): void
-    {
-        foreach ($this->tables as $table) {
-            if (Schema::hasColumn($table, 'organization_id')) {
-                Schema::table($table, function (Blueprint $t) use ($table) {
+   public function down(): void
+{
+    foreach ($this->tables as $table) {
+        if (Schema::hasColumn($table, 'organization_id')) {
+            Schema::table($table, function (Blueprint $t) use ($table) {
+                if (Schema::hasIndex($table, "idx_{$table}_org_id")) {
                     $t->dropIndex("idx_{$table}_org_id");
-                    $t->dropColumn('organization_id');
-                });
-            }
+                }
+                $t->dropColumn('organization_id');
+            });
         }
     }
+}
 };
