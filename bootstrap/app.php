@@ -18,7 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
     'admin'          => \App\Http\Middleware\IsAdmin::class,
     'tenant'         => \App\Http\Middleware\ResolveTenant::class,
     ]);
-
+        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
         $middleware->redirectGuestsTo(fn () => null);
     })
     ->withExceptions(function (Exceptions $exceptions) {
