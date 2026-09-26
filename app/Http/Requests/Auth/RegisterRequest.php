@@ -14,7 +14,7 @@ class RegisterRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name'     => 'required|string|max:255',
+            'name' => ['required', 'string', 'max:255', 'regex:/^[\p{L}\s\'-]+$/u'],
             'username' => [
                 'nullable',
                 'string',
@@ -31,6 +31,7 @@ class RegisterRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'name.regex'         => 'Name may only contain letters, spaces, hyphens, and apostrophes.',
             'name.required'      => 'Name is required.',
             'name.max'           => 'Name must not exceed 255 characters.',
             'username.min'       => 'Username must be at least 3 characters.',

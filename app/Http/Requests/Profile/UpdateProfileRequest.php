@@ -14,7 +14,7 @@ class UpdateProfileRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name'          => 'sometimes|string|max:255|regex:/^[\p{L}\s\-\.]+$/u',
+            'name' => ['sometimes', 'string', 'max:255', 'regex:/^[\p{L}\s\'-]+$/u'],
             'username'      => [
                 'sometimes',
                 'string',
@@ -32,7 +32,7 @@ class UpdateProfileRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'name.regex'          => 'Name may only contain letters, spaces, hyphens, and dots.',
+            'name.regex'          => 'Name may only contain letters, spaces, hyphens, and apostrophes.',
             'username.min'        => 'Username must be at least 3 characters.',
             'username.max'        => 'Username must not exceed 30 characters.',
             'username.regex'      => 'Username may only contain letters, numbers, and underscores.',
