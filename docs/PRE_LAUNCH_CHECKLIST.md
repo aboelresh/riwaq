@@ -1,92 +1,117 @@
-\# Pre-Launch Security Checklist — Code Master
+# Pre-Launch Deployment Checklist — Code Master v1.0.0
 
+## 1. Server Requirements
+- [ ] Ubuntu 24.04 LTS
+- [ ] PHP 8.2-fpm + extensions (mysql, redis, mbstring, xml, curl, zip, gd, bcmath, intl)
+- [ ] MySQL 8.4 running
+- [ ] Redis 7 running
+- [ ] Nginx running
+- [ ] Supervisor running
+- [ ] Composer installed globally
+- [ ] SSL certificate (Let's Encrypt via certbot)
 
-
-\## Run Automated Audit
-
+## 2. Application Setup
 ```bash
-
-php artisan app:security-audit
-
+cd /var/www/codemaster
+git clone https://github.com/your-org/code-master.git .
+cp .env.production.example .env
+nano .env  # Fill all CHANGE_ME values
+php artisan app:setup-production
 ```
 
-All items must pass or be consciously accepted as warnings.
+- [ ] APP_KEY generated
+- [ ] JWT_SECRET generated
+- [ ] All CHANGE_ME values replaced
+- [ ] Storage link created
+- [ ] Config/route/view cached
 
+## 3. Environment Verification
+```bash
+php artisan app:security-audit
+```
 
+- [ ] APP_DEBUG=false 
+- [ ] APP_ENV=production 
+- [ ] APP_KEY set 
+- [ ] JWT_SECRET strong 
+- [ ] DB_PASSWORD strong 
+- [ ] CORS_ALLOWED_ORIGINS specific domains 
+- [ ] MAIL_MAILER=smtp with real credentials 
 
-\## Environment
+## 4. Database
+- [ ] MySQL database created with utf8mb4_unicode_ci
+- [ ] Migrations ran successfully (no errors)
+- [ ] ProductionSeeder ran (plans + admin + default org)
+- [ ] Admin password changed from default
+- [ ] Verify: `GET /api/v1/health` → database.status = "ok"
 
-\- \[ ] `APP\_ENV=production`
+## 5. Queue Workers
+```bash
+# Copy supervisor config
+cp docker/supervisor/codemaster.conf /etc/supervisor/conf.d/
+supervisorctl reread
+supervisorctl update
+supervisorctl start codemaster:*
+supervisorctl status
+```
 
-\- \[ ] `APP\_DEBUG=false`
+- [ ] Workers running (codemaster-worker-default x2)
+- [ ] Email worker running (codemaster-worker-emails x1)
+- [ ] Logs writing to storage/logs/worker-*.log
 
-\- \[ ] `APP\_KEY` generated (`php artisan key:generate`)
+## 6. Scheduler (Cron)
+```bash
+crontab -e -u www-data
+# Add:
+* * * * * cd /var/www/codemaster && php artisan schedule:run >> /dev/null 2>&1
+```
 
-\- \[ ] `JWT\_SECRET` generated (`php artisan jwt:secret`)
+- [ ] Cron entry added
+- [ ] Test: `php artisan schedule:run` runs without errors
 
-\- \[ ] `DB\_PASSWORD` is strong (16+ chars, mixed)
+## 7. Nginx + SSL
+```bash
+cp docker/nginx/production.conf /etc/nginx/sites-available/codemaster
+ln -s /etc/nginx/sites-available/codemaster /etc/nginx/sites-enabled/
+certbot --nginx -d api.codemaster.com
+nginx -t && systemctl reload nginx
+```
 
-\- \[ ] `REDIS\_PASSWORD` is set
+- [ ] HTTP → HTTPS redirect working
+- [ ] SSL certificate valid
+- [ ] Security headers present (check https://securityheaders.com)
+- [ ] HSTS header set
 
-\- \[ ] `MAIL\_MAILER=smtp` with real credentials
+## 8. Final Smoke Tests (on production)
+```bash
+# Health check
+curl https://api.codemaster.com/api/v1/health
 
-\- \[ ] `CORS\_ALLOWED\_ORIGINS` restricted to your domains
+# Auth
+curl -X POST https://api.codemaster.com/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@codemaster.com","password":"your_password"}'
+```
 
+- [ ] `GET /api/v1/health` → healthy: true
+- [ ] `POST /api/v1/auth/login` → token returned
+- [ ] `POST /api/v1/auth/login` (wrong password) → 401
+- [ ] `GET /api/v1/admin/tracks` (learner token) → 403
+- [ ] `GET /api/v1/profile` (no token) → 401 JSON (not HTML)
+- [ ] `GET /api/v1/documentation` → Swagger UI loads
 
+## 9. PHPUnit on Production Server
+```bash
+php artisan test --env=testing
+```
 
-\## Database
+- [ ] 127 tests / 398 assertions — all pass
 
-\- \[ ] MySQL 8.4 running
+## 10. Monitoring
+- [ ] Logs rotating (`storage/logs/laravel.log`, `errors.log`, `audit.log`)
+- [ ] Server monitoring set up (uptime, memory, disk)
+- [ ] Alert on `/api/v1/health` returning 503
 
-\- \[ ] `php artisan migrate --force` ran successfully
-
-\- \[ ] `php artisan db:seed --class=ProductionSeeder` ran once
-
-\- \[ ] Admin password changed from default
-
-
-
-\## Security
-
-\- \[ ] HTTPS configured (SSL certificate)
-
-\- \[ ] Security headers verified (check https://securityheaders.com)
-
-\- \[ ] Rate limiting tested (5 login attempts = 429)
-
-\- \[ ] JWT tokens expire correctly (60 min default)
-
-\- \[ ] No sensitive data in logs (verified `storage/logs/`)
-
-
-
-\## Performance
-
-\- \[ ] `php artisan config:cache`
-
-\- \[ ] `php artisan route:cache`
-
-\- \[ ] `php artisan view:cache`
-
-\- \[ ] Queue worker running (Supervisor configured)
-
-\- \[ ] Redis connected for cache + queue
-
-
-
-\## Final Verification
-
-\- \[ ] `GET /api/v1/health` returns `healthy: true`
-
-\- \[ ] Login works with correct credentials
-
-\- \[ ] Login fails with wrong credentials (401)
-
-\- \[ ] Admin route rejects learner token (403)
-
-\- \[ ] Unauth request returns JSON 401 (not HTML)
-
-\- \[ ] Swagger UI accessible at `/api/documentation`
-
-\- \[ ] PHPUnit: `php artisan test` — 86 tests pass
-
+##  Go/No-Go Decision
+**GO** if: Security audit 9+/15, all smoke tests pass, queue workers running, SSL valid.
+**NO-GO** if: Any smoke test fails, health check fails, or APP_DEBUG=true.
