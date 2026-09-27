@@ -1,24 +1,51 @@
-*.log
-.DS_Store
+# Environment files — NEVER commit secrets
 .env
-.env.backup
-.env.production
-.phpactor.json
+.env.*
+!.env.example
+!.env.production.example
+
+# Laravel generated
 .phpunit.result.cache
-/.fleet
-/.idea
-/.nova
 /.phpunit.cache
-/.vscode
-/.zed
-/auth.json
-/node_modules
+/bootstrap/cache/*.php
+/storage/*.key
+/storage/pail
 /public/build
 /public/hot
 /public/storage
-/storage/*.key
-/storage/pail
+
+# Dependencies
 /vendor
-Homestead.json
-Homestead.yaml
+/node_modules
+
+# IDE & OS
+.DS_Store
 Thumbs.db
+.idea/
+.vscode/
+.fleet/
+.nova/
+.zed/
+/.phpactor.json
+/auth.json
+/Homestead.json
+/Homestead.yaml
+
+# PHP binaries
+*.phar
+
+# Dev tools & junk
+php-dev.ini
+findstr
+review.txt
+
+# Logs
+*.log
+/storage/logs/*.log
+
+# Generated cache
+storage/api-docs/*.yaml
+
+# Postman
+*.postman_collection.json
+*.postman_environment.json
