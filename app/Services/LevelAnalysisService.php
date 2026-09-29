@@ -251,7 +251,7 @@ class LevelAnalysisService
     private function systemPrompt(): string
     {
         return <<<'PROMPT'
-أنت مدرّب محترف لمنصة تعليم البرمجة Code Master. مهمتك تحليل بيانات المتعلم وإعطاء تقييم مفصّل وعملي.
+أنت مدرّب محترف لمنصة تعليم البرمجة Riwaq. مهمتك تحليل بيانات المتعلم وإعطاء تقييم مفصّل وعملي.
 
 المتعلم بيتعلم في مسارات (web/mobile/data/game)، كل مسار فيه courses → topics → quizzes.
 لازم ترد بـ JSON صحيح فقط (بدون أي markdown أو نص خارج JSON) بالشكل التالي بالظبط:

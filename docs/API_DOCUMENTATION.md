@@ -1,4 +1,4 @@
-#  Code Master - API Documentation
+#  Riwaq - API Documentation
 
 ## Base URL
 ```

@@ -1,4 +1,4 @@
-\# Architecture Decision Records — CodeMaster
+\# Architecture Decision Records — Riwaq
 
 
 

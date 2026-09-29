@@ -21,7 +21,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
                    script: |
-            cd /var/www/codemaster
+            cd /var/www/Riwaq
             git pull origin main
             composer install --no-dev --optimize-autoloader --no-interaction
             php artisan app:setup-production

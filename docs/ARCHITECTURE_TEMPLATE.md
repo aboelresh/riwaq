@@ -1,4 +1,4 @@
-\# Architecture Template — Code Master Backend
+\# Architecture Template — Riwaq Backend
 
 
 

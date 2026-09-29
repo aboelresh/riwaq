@@ -87,7 +87,7 @@ class ResolveTenant
 
     private function extractSubdomain(string $host): ?string
     {
-        $baseDomain = config('app.base_domain', 'codemaster.com');
+        $baseDomain = config('app.base_domain', 'Riwaq.com');
 
         if (str_ends_with($host, '.' . $baseDomain)) {
             return str_replace('.' . $baseDomain, '', $host);

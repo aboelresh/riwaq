@@ -1,4 +1,4 @@
-# 🚀  Code Master - API Reference Guide
+# 🚀  Riwaq - API Reference Guide
 
 ## 📋 جدول المحتويات
 

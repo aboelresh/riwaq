@@ -1,4 +1,4 @@
-\# Backup Strategy — Code Master Backend
+\# Backup Strategy — Riwaq Backend
 
 
 
@@ -6,7 +6,7 @@
 
 \- Engine: MySQL 8.4
 
-\- Database name: codemaster\_production
+\- Database name: Riwaq\_production
 
 
 
@@ -18,7 +18,7 @@
 
 ```bash
 
-mysqldump -u root -p codemaster\_production \\
+mysqldump -u root -p Riwaq\_production \\
 
 &#x20; --single-transaction \\
 
@@ -26,7 +26,7 @@ mysqldump -u root -p codemaster\_production \\
 
 &#x20; --triggers \\
 
-&#x20; | gzip > /backups/daily/codemaster\_$(date +%Y%m%d).sql.gz
+&#x20; | gzip > /backups/daily/Riwaq\_$(date +%Y%m%d).sql.gz
 
 ```
 
@@ -36,13 +36,13 @@ mysqldump -u root -p codemaster\_production \\
 
 ```bash
 
-mysqldump -u root -p codemaster\_production \\
+mysqldump -u root -p Riwaq\_production \\
 
 &#x20; --single-transaction \\
 
 &#x20; --all-databases \\
 
-&#x20; | gzip > /backups/weekly/codemaster\_full\_$(date +%Y%m%d).sql.gz
+&#x20; | gzip > /backups/weekly/Riwaq\_full\_$(date +%Y%m%d).sql.gz
 
 ```
 
@@ -70,19 +70,19 @@ php artisan down
 
 \# 2. Drop and recreate the database
 
-mysql -u root -p -e "DROP DATABASE IF EXISTS codemaster\_production; CREATE DATABASE codemaster\_production CHARACTER SET utf8mb4 COLLATE utf8mb4\_unicode\_ci;"
+mysql -u root -p -e "DROP DATABASE IF EXISTS Riwaq\_production; CREATE DATABASE Riwaq\_production CHARACTER SET utf8mb4 COLLATE utf8mb4\_unicode\_ci;"
 
 
 
 \# 3. Restore from backup
 
-gunzip -c /backups/daily/codemaster\_YYYYMMDD.sql.gz | mysql -u root -p codemaster\_production
+gunzip -c /backups/daily/Riwaq\_YYYYMMDD.sql.gz | mysql -u root -p Riwaq\_production
 
 
 
 \# 4. Verify
 
-mysql -u root -p codemaster\_production -e "SHOW TABLES;"
+mysql -u root -p Riwaq\_production -e "SHOW TABLES;"
 
 
 
@@ -98,7 +98,7 @@ php artisan up
 
 \- Primary: same server /backups/ (RAID)
 
-\- Secondary: S3 bucket s3://codemaster-backups/ (auto-sync daily)
+\- Secondary: S3 bucket s3://Riwaq-backups/ (auto-sync daily)
 
 
 
@@ -128,9 +128,9 @@ DB\_HOST=127.0.0.1
 
 DB\_PORT=3306
 
-DB\_DATABASE=codemaster\_production
+DB\_DATABASE=Riwaq\_production
 
-DB\_USERNAME=codemaster\_user
+DB\_USERNAME=Riwaq\_user
 
 DB\_PASSWORD=STRONG\_PASSWORD\_HERE
 

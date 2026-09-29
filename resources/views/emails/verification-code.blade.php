@@ -79,7 +79,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🎓 Code Master</h1>
+            <h1>🎓 Riwaq</h1>
             <p>Your Learning Journey Starts Here</p>
         </div>
         
@@ -87,7 +87,7 @@
             <h2>Welcome, {{ $user->name }}! 👋</h2>
             
             <p class="message">
-                Thank you for joining <strong>Code Master</strong>! 
+                Thank you for joining <strong>Riwaq</strong>! 
                 To activate your account and start learning, please verify your email address.
             </p>
             
@@ -109,7 +109,7 @@
         </div>
         
         <div class="footer">
-            <p>© {{ date('Y') }} Code Master - Learning Platform</p>
+            <p>© {{ date('Y') }} Riwaq - Learning Platform</p>
             <p>Happy Learning! 🚀</p>
         </div>
     </div>

@@ -1,4 +1,4 @@
-# Code Master - Database Schema
+# Riwaq - Database Schema
 
 ### 1. users
 | Column | Type | Attributes |

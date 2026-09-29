@@ -1,4 +1,4 @@
-\# Security — CodeMaster API
+\# Security — Riwaq API
 
 
 

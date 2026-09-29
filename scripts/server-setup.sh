@@ -1,11 +1,11 @@
 #!/bin/bash
-# Code Master — Server Setup Script
+# Riwaq — Server Setup Script
 # Run once on a fresh Ubuntu 24.04 server
 # Usage: bash server-setup.sh
 
 set -e
 
-echo "=== Code Master Server Setup ==="
+echo "=== Riwaq Server Setup ==="
 
 # 1. System updates
 apt-get update && apt-get upgrade -y
@@ -37,20 +37,20 @@ curl -sS https://getcomposer.org/installer | php
 mv composer.phar /usr/local/bin/composer
 
 # 8. Create application user and directory
-useradd -r -s /bin/bash www-codemaster || true
-mkdir -p /var/www/codemaster
-chown www-data:www-data /var/www/codemaster
+useradd -r -s /bin/bash www-Riwaq || true
+mkdir -p /var/www/Riwaq
+chown www-data:www-data /var/www/Riwaq
 
 # 9. MySQL setup
 mysql -u root <<EOF
-CREATE DATABASE IF NOT EXISTS codemaster_production CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER IF NOT EXISTS 'codemaster_user'@'localhost' IDENTIFIED BY '${DB_PASSWORD:-CHANGE_ME}';
-GRANT ALL PRIVILEGES ON codemaster_production.* TO 'codemaster_user'@'localhost';
+CREATE DATABASE IF NOT EXISTS Riwaq_production CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS 'Riwaq_user'@'localhost' IDENTIFIED BY '${DB_PASSWORD:-CHANGE_ME}';
+GRANT ALL PRIVILEGES ON Riwaq_production.* TO 'Riwaq_user'@'localhost';
 FLUSH PRIVILEGES;
 EOF
 
 echo "=== Server setup complete ==="
-echo "Next: Clone repo to /var/www/codemaster and run:"
+echo "Next: Clone repo to /var/www/Riwaq and run:"
 echo "  cp .env.production.example .env"
 echo "  nano .env  # fill in all values"
 echo "  php artisan app:setup-production"

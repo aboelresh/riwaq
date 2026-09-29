@@ -1,4 +1,4 @@
-# Pre-Launch Deployment Checklist — Code Master v1.0.0
+# Pre-Launch Deployment Checklist — Riwaq v1.0.0
 
 ## 1. Server Requirements
 - [ ] Ubuntu 24.04 LTS
@@ -12,8 +12,8 @@
 
 ## 2. Application Setup
 ```bash
-cd /var/www/codemaster
-git clone https://github.com/your-org/code-master.git .
+cd /var/www/Riwaq
+git clone https://github.com/your-org/riwaq.git .
 cp .env.production.example .env
 nano .env  # Fill all CHANGE_ME values
 php artisan app:setup-production
@@ -48,22 +48,22 @@ php artisan app:security-audit
 ## 5. Queue Workers
 ```bash
 # Copy supervisor config
-cp docker/supervisor/codemaster.conf /etc/supervisor/conf.d/
+cp docker/supervisor/Riwaq.conf /etc/supervisor/conf.d/
 supervisorctl reread
 supervisorctl update
-supervisorctl start codemaster:*
+supervisorctl start Riwaq:*
 supervisorctl status
 ```
 
-- [ ] Workers running (codemaster-worker-default x2)
-- [ ] Email worker running (codemaster-worker-emails x1)
+- [ ] Workers running (Riwaq-worker-default x2)
+- [ ] Email worker running (Riwaq-worker-emails x1)
 - [ ] Logs writing to storage/logs/worker-*.log
 
 ## 6. Scheduler (Cron)
 ```bash
 crontab -e -u www-data
 # Add:
-* * * * * cd /var/www/codemaster && php artisan schedule:run >> /dev/null 2>&1
+* * * * * cd /var/www/Riwaq && php artisan schedule:run >> /dev/null 2>&1
 ```
 
 - [ ] Cron entry added
@@ -71,9 +71,9 @@ crontab -e -u www-data
 
 ## 7. Nginx + SSL
 ```bash
-cp docker/nginx/production.conf /etc/nginx/sites-available/codemaster
-ln -s /etc/nginx/sites-available/codemaster /etc/nginx/sites-enabled/
-certbot --nginx -d api.codemaster.com
+cp docker/nginx/production.conf /etc/nginx/sites-available/Riwaq
+ln -s /etc/nginx/sites-available/Riwaq /etc/nginx/sites-enabled/
+certbot --nginx -d api.Riwaq.com
 nginx -t && systemctl reload nginx
 ```
 
@@ -85,12 +85,12 @@ nginx -t && systemctl reload nginx
 ## 8. Final Smoke Tests (on production)
 ```bash
 # Health check
-curl https://api.codemaster.com/api/v1/health
+curl https://api.Riwaq.com/api/v1/health
 
 # Auth
-curl -X POST https://api.codemaster.com/api/v1/auth/login \
+curl -X POST https://api.Riwaq.com/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@codemaster.com","password":"your_password"}'
+  -d '{"email":"admin@Riwaq.com","password":"your_password"}'
 ```
 
 - [ ] `GET /api/v1/health` → healthy: true

@@ -55,7 +55,7 @@ class RegisterController extends Controller
         \App\Services\NotificationService::send(
             userId: $user->id,
             type:   'welcome',
-            title:  'Welcome to Code Master!',
+            title:  'Welcome to Riwaq!',
             body:   "Hi {$user->name}! Start by taking the assessment quiz.",
             data:   ['url' => '/assessment']
         );

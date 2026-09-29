@@ -27,9 +27,9 @@ class ProductionSeeder extends Seeder
 
         $this->command->info('Creating admin user...');
         $admin = User::firstOrCreate(
-            ['email' => env('ADMIN_EMAIL', 'admin@codemaster.com')],
+            ['email' => env('ADMIN_EMAIL', 'admin@Riwaq.com')],
             [
-                'name'              => env('ADMIN_NAME', 'Code Master Admin'),
+                'name'              => env('ADMIN_NAME', 'Riwaq Admin'),
                 'username'          => 'admin',
                 'password'          => Hash::make(env('ADMIN_PASSWORD', 'CHANGE_ME_ON_FIRST_LOGIN')),
                 'role'              => 'admin',
@@ -43,7 +43,7 @@ class ProductionSeeder extends Seeder
         $org = Organization::firstOrCreate(
             ['slug' => env('DEFAULT_ORG_SLUG', 'default')],
             [
-                'name'      => env('APP_NAME', 'Code Master Academy'),
+                'name'      => env('APP_NAME', 'Riwaq Academy'),
                 'subdomain' => env('DEFAULT_ORG_SUBDOMAIN', 'app'),
                 'owner_id'  => $admin->id,
                 'plan_id'   => $plan?->id,

@@ -1,4 +1,4 @@
-\# Deployment Runbook — Code Master
+\# Deployment Runbook — Riwaq
 
 
 
@@ -28,9 +28,9 @@
 
 \# 1. Clone repo
 
-git clone https://github.com/your-org/code-master.git /var/www/codemaster
+git clone https://github.com/your-org/riwaq.git /var/www/Riwaq
 
-cd /var/www/codemaster
+cd /var/www/Riwaq
 
 
 
@@ -82,17 +82,17 @@ php artisan view:cache
 
 \# 8. Set permissions
 
-chown -R www-data:www-data /var/www/codemaster
+chown -R www-data:www-data /var/www/Riwaq
 
-chmod -R 755 /var/www/codemaster/storage
+chmod -R 755 /var/www/Riwaq/storage
 
-chmod -R 755 /var/www/codemaster/bootstrap/cache
+chmod -R 755 /var/www/Riwaq/bootstrap/cache
 
 
 
 \# 9. Setup queue worker (Supervisor)
 
-sudo nano /etc/supervisor/conf.d/codemaster-worker.conf
+sudo nano /etc/supervisor/conf.d/Riwaq-worker.conf
 
 ```
 
@@ -102,11 +102,11 @@ Supervisor config:
 
 ```ini
 
-\[program:codemaster-worker]
+\[program:Riwaq-worker]
 
 process\_name=%(program\_name)s\_%(process\_num)02d
 
-command=php /var/www/codemaster/artisan queue:work redis --tries=3 --backoff=60
+command=php /var/www/Riwaq/artisan queue:work redis --tries=3 --backoff=60
 
 autostart=true
 
@@ -118,7 +118,7 @@ numprocs=2
 
 redirect\_stderr=true
 
-stdout\_logfile=/var/www/codemaster/storage/logs/worker.log
+stdout\_logfile=/var/www/Riwaq/storage/logs/worker.log
 
 ```
 
@@ -130,7 +130,7 @@ sudo supervisorctl reread
 
 sudo supervisorctl update
 
-sudo supervisorctl start codemaster-worker:\*
+sudo supervisorctl start Riwaq-worker:\*
 
 ```
 
@@ -162,7 +162,7 @@ php artisan config:cache
 
 sudo systemctl reload php8.2-fpm
 
-sudo supervisorctl restart codemaster-worker:\*
+sudo supervisorctl restart Riwaq-worker:\*
 
 ```
 
@@ -174,7 +174,7 @@ sudo supervisorctl restart codemaster-worker:\*
 
 ```bash
 
-curl https://api.codemaster.com/api/v1/health
+curl https://api.Riwaq.com/api/v1/health
 
 ```
 

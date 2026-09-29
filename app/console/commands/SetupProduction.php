@@ -37,7 +37,7 @@ class SetupProduction extends Command
        // 5. Remind about cron
        $this->info('Adding cron job reminder...');
        $this->warn('IMPORTANT: Add this cron entry on the server:');
-       $this->warn('* * * * * cd /var/www/codemaster && php artisan schedule:run >> /dev/null 2>&1');
+       $this->warn('* * * * * cd /var/www/Riwaq && php artisan schedule:run >> /dev/null 2>&1');
 
         $this->info('');
         $this->info('Production setup complete!');

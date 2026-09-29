@@ -1,4 +1,4 @@
-\# Architecture — CodeMaster API
+\# Architecture — Riwaq API
 
 
 
@@ -344,9 +344,9 @@ Queue (Redis)
 
 Worker (Supervisor)
 
-├── codemaster-worker-default (x2) — general queue
+├── Riwaq-worker-default (x2) — general queue
 
-└── codemaster-worker-emails (x1) — email queue
+└── Riwaq-worker-emails (x1) — email queue
 
 │
 

@@ -19,7 +19,7 @@ class CoreSeeder extends Seeder
         echo " Seeding database...\n\n";
 
         $admin = User::firstOrCreate(
-            ['email' => 'Admin@codemaster.com'],
+            ['email' => 'Admin@Riwaq.com'],
             [
                 'name'              => 'Admin',
                 'password'          => Hash::make('password'),
@@ -30,7 +30,7 @@ class CoreSeeder extends Seeder
 
         
         User::firstOrCreate(
-            ['email' => 'learner@codemaster.com'],
+            ['email' => 'learner@Riwaq.com'],
             [
                 'name'              => 'Learner Test',
                 'password'          => Hash::make('password123'),
@@ -594,8 +594,8 @@ class CoreSeeder extends Seeder
         echo "\n Database seeded successfully!\n\n";
 
         $this->command->info(' Admin and Learner accounts created successfully!');
-        $this->command->info(' Admin: admin@codemaster.com / password');
-        $this->command->info(' Learner: learner@codemaster.com / password123');
+        $this->command->info(' Admin: admin@Riwaq.com / password');
+        $this->command->info(' Learner: learner@Riwaq.com / password123');
 
         echo " Created:\n";
         echo "   - 4 Tracks (Web, Mobile, Data Science, Game Dev)\n";

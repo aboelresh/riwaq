@@ -1,4 +1,4 @@
-# Business Rules — Code Master
+# Business Rules — Riwaq
 
 ## 1. Track Enrollment
 - User can enroll in ONE active track at a time

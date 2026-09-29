@@ -21,7 +21,7 @@ class VerificationCodeMail extends Mailable
 
     public function build()
     {
-        return $this->subject('Verify Your Email - Code Master')
+        return $this->subject('Verify Your Email - Riwaq')
                     ->view('emails.verification-code');
     }
 }

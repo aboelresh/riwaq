@@ -1,4 +1,4 @@
-# Code Master - Feature List
+# Riwaq - Feature List
 
 ## 1. User Management (إدارة المستخدمين)
 ### 1.1 Authentication (المصادقة)

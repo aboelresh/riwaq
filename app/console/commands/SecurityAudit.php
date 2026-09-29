@@ -17,7 +17,7 @@ class SecurityAudit extends Command
 
     public function handle(): void
     {
-        $this->info('Code Master — Security Audit');
+        $this->info('Riwaq — Security Audit');
         $this->info(str_repeat('─', 50));
 
         $this->checkEnvironment();

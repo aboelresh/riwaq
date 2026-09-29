@@ -5,8 +5,8 @@ return [
     'documentations' => [
         'default' => [
             'api' => [
-                'title' => env('L5_SWAGGER_API_TITLE', 'Code Master API'),
-                'description' => env('L5_SWAGGER_API_DESCRIPTION', 'Code Master API Documentation'),
+                'title' => env('L5_SWAGGER_API_TITLE', 'Riwaq API'),
+                'description' => env('L5_SWAGGER_API_DESCRIPTION', 'Riwaq API Documentation'),
                 'version' => env('L5_SWAGGER_API_VERSION', '1.0.0'),
             ],
 

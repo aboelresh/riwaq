@@ -1,4 +1,4 @@
-\# Multi-Tenancy — CodeMaster
+\# Multi-Tenancy — Riwaq
 
 
 

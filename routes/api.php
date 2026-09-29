@@ -44,7 +44,7 @@ Route::prefix('v1')->group(function () {
 // Health check
 Route::get('/', fn() => response()->json([
     'success' => true,
-    'message' => 'Code Master API',
+    'message' => 'Riwaq API',
     'version' => '1.0.0',
 ]));
 Route::get('/health', [\App\Http\Controllers\Api\HealthController::class, 'check']);

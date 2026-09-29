@@ -19,7 +19,7 @@ class ExtraSeeder extends Seeder
         echo " Running ExtraSeeder...\n\n";
 
         $admin = User::firstOrCreate(
-            ['email' => 'Admin@codemaster.com'],
+            ['email' => 'Admin@Riwaq.com'],
             [
                 'name'              => 'Admin',
                 'password'          => Hash::make('password'),

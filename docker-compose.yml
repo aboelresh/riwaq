@@ -6,19 +6,19 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: codemaster-app
-    container_name: codemaster_app
+    image: Riwaq-app
+    container_name: Riwaq_app
     restart: unless-stopped
     working_dir: /var/www
     volumes:
       - ./:/var/www
       - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
     networks:
-      - codemaster
+      - Riwaq
 
   nginx:
     image: nginx:alpine
-    container_name: codemaster_nginx
+    container_name: Riwaq_nginx
     restart: unless-stopped
     ports:
       - "80:80"
@@ -30,11 +30,11 @@ services:
     depends_on:
       - app
     networks:
-      - codemaster
+      - Riwaq
 
   db:
     image: mysql:8.4
-    container_name: codemaster_db
+    container_name: Riwaq_db
     restart: unless-stopped
     environment:
       MYSQL_DATABASE: ${DB_DATABASE}
@@ -47,11 +47,11 @@ services:
     ports:
       - "3306:3306"
     networks:
-      - codemaster
+      - Riwaq
 
   redis:
     image: redis:7-alpine
-    container_name: codemaster_redis
+    container_name: Riwaq_redis
     restart: unless-stopped
     command: redis-server --appendonly yes
     volumes:
@@ -59,13 +59,13 @@ services:
     ports:
       - "6379:6379"
     networks:
-      - codemaster
+      - Riwaq
 
   queue:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: codemaster_queue
+    container_name: Riwaq_queue
     restart: unless-stopped
     working_dir: /var/www
     command: php artisan queue:work --tries=3 --backoff=60 --timeout=300
@@ -76,10 +76,10 @@ services:
       - db
       - redis
     networks:
-      - codemaster
+      - Riwaq
 
 networks:
-  codemaster:
+  Riwaq:
     driver: bridge
 
 volumes:

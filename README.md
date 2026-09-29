@@ -1,4 +1,4 @@
-# CodeMaster API
+# Riwaq API
 
 > Multi-tenant SaaS adaptive learning platform built with Laravel 12.
 
@@ -11,7 +11,7 @@
 
 ## Overview
 
-CodeMaster is a REST API backend for an adaptive learning platform. It supports
+Riwaq is a REST API backend for an adaptive learning platform. It supports
 multiple academies (tenants) on a single deployment, each with isolated content,
 users, and subscriptions.
 
@@ -120,8 +120,8 @@ accidentally return cross-tenant data from a Controller — the Model prevents i
 
 ```bash
 # 1. Clone
-git clone https://github.com/your-org/code-master.git
-cd code-master
+git clone https://github.com/your-org/riwaq.git
+cd riwaq
 
 # 2. Install dependencies
 composer install
@@ -147,7 +147,7 @@ Copy `.env.example` and fill in your values. Key variables:
 
 ```env
 DB_CONNECTION=mysql
-DB_DATABASE=codemaster
+DB_DATABASE=Riwaq
 
 REDIS_HOST=127.0.0.1
 
@@ -191,7 +191,7 @@ Authorization: Bearer <token>
 
 ## Multi-Tenancy
 
-CodeMaster supports multiple academies (organizations) on a single server.
+Riwaq supports multiple academies (organizations) on a single server.
 
 **How it works:**
 
@@ -232,11 +232,11 @@ JWT contains: { sub: user_id, org_id: org_id }
 php artisan queue:work
 
 # Production (managed by Supervisor)
-# See docker/supervisor/codemaster.conf
+# See docker/supervisor/Riwaq.conf
 ```
 
 **Scheduler** runs via cron:
-cd /var/www/codemaster && php artisan schedule:run
+cd /var/www/Riwaq && php artisan schedule:run
 
 Scheduled tasks:
 - `app:cleanup-expired-codes` — daily

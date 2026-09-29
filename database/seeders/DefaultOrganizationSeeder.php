@@ -17,7 +17,7 @@ class DefaultOrganizationSeeder extends Seeder
         Organization::firstOrCreate(
             ['slug' => 'default'],
             [
-                'name'      => 'Code Master Academy',
+                'name'      => 'Riwaq Academy',
                 'subdomain' => 'app',
                 'owner_id'  => $admin->id,
                 'plan_id'   => $plan?->id,

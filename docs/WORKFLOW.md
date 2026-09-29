@@ -1,4 +1,4 @@
-#  Code Master - Workflow & System Flow
+#  Riwaq - Workflow & System Flow
 
 ## 1. User Registration & Track Selection Flow
 ```
