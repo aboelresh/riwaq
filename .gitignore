@@ -49,3 +49,4 @@ storage/api-docs/*.yaml
 # Postman
 *.postman_collection.json
 *.postman_environment.json
+composer-setup.php
