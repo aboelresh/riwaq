@@ -8,7 +8,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     name: Deploy
-    if: github.ref == 'refs/heads/main'
+    if:false  # Disabled until production server is configured
 
     steps:
       - name: Checkout

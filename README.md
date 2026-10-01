@@ -22,29 +22,29 @@ at the database query level via Eloquent Global Scopes, not just middleware.
 
 ## Features
 
-| Feature | Status |
-|---|---|
-| JWT Authentication | ✅ |
-| Multi-tenancy (Shared Schema) | ✅ |
-| Role-based Authorization (Admin / Learner) | ✅ |
-| Tenant Isolation (BelongsToTenant Global Scope) | ✅ |
-| Learning Tracks → Courses → Topics | ✅ |
-| Quiz Engine with retry cooldowns | ✅ |
-| Video progress tracking with resume | ✅ |
-| Assessment + track recommendation | ✅ |
-| AI Chat (multi-provider + fallback) | ✅ |
-| Team collaboration (sections, tasks, chat) | ✅ |
-| In-app Notifications | ✅ |
-| Background email jobs (queued) | ✅ |
-| SaaS Plans + Entitlements | ✅ |
-| Organization management | ✅ |
-| Rate limiting (auth, AI, API) | ✅ |
-| Search | ✅ |
-| API versioning (`/api/v1/`) | ✅ |
-| OpenAPI / Swagger documentation | ✅ |
-| Health check endpoint | ✅ |
-| Docker + docker-compose | ✅ |
-| GitHub Actions CI/CD | ✅ |
+| Feature |
+|---|
+| JWT Authentication |
+| Multi-tenancy (Shared Schema) |
+| Role-based Authorization (Admin / Learner) |
+| Tenant Isolation (BelongsToTenant Global Scope) |
+| Learning Tracks → Courses → Topics |
+| Quiz Engine with retry cooldowns |
+| Video progress tracking with resume |
+| Assessment + track recommendation |
+| AI Chat (multi-provider + fallback) |
+| Team collaboration (sections, tasks, chat) |
+| In-app Notifications |
+| Background email jobs (queued) |
+| SaaS Plans + Entitlements |
+| Organization management |
+| Rate limiting (auth, AI, API) |
+| Search |
+| API versioning (`/api/v1/`) |
+| OpenAPI / Swagger documentation |
+| Health check endpoint |
+| Docker + docker-compose |
+| GitHub Actions CI/CD |
 
 ---
 
@@ -257,16 +257,16 @@ php artisan test tests/Feature/Security/
 
 **Results:**
 
-| Suite | Tests | Status |
-|---|---|---|
-| Unit (QuizService) | 8 | ✅ |
-| Feature (Auth) | 11 | ✅ |
-| Feature (Admin) | 12 | ✅ |
-| Feature (Teams) | 16 | ✅ |
-| Feature (Profile, Search, etc.) | 21 | ✅ |
-| Security (Auth, Authorization, Input, Tenant, API) | 35 | ✅ |
-| SaaS (Tenant Isolation) | 10 | ✅ |
-| **Total** | **127** | **✅ 398 assertions** |
+| Suite | Tests |
+|---|---|
+| Unit (QuizService) | 8 |
+| Feature (Auth) | 11 |
+| Feature (Admin) | 12 |
+| Feature (Teams) | 16 |
+| Feature (Profile, Search, etc.) | 21 |
+| Security (Auth, Authorization, Input, Tenant, API) | 35 |
+| SaaS (Tenant Isolation) | 10 |
+| **Total** | **127** | ** 398 assertions** |
 
 Tested on both **SQLite** (fast, for CI) and **MySQL 8** (production compatibility).
 
