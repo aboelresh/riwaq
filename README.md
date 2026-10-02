@@ -120,7 +120,7 @@ accidentally return cross-tenant data from a Controller — the Model prevents i
 
 ```bash
 # 1. Clone
-git clone https://github.com/your-org/riwaq.git
+git clone https://github.com/aboelresh/riwaq.git
 cd riwaq
 
 # 2. Install dependencies
