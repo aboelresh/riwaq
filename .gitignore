@@ -50,3 +50,9 @@ storage/api-docs/*.yaml
 *.postman_collection.json
 *.postman_environment.json
 composer-setup.php
+
+php-dev.ini
+.user.ini
+*.postman_collection.json
+*.postman_environment.json
+project_tree.txt
