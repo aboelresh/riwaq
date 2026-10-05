@@ -3,13 +3,15 @@
 namespace App\Http\Controllers\Api\Organization;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\UserResource;
-use App\Models\Organization;
+use App\Models\AiUsageLog;
+use App\Models\Course;
+use App\Models\Track;
 use App\SaaS\EntitlementService;
 use App\SaaS\TenantContext;
+use App\Services\AuditLogService;
+use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 
 class OrganizationController extends Controller
 {
@@ -25,30 +27,30 @@ class OrganizationController extends Controller
         return response()->json([
             'success' => true,
             'data'    => [
-                'id'           => $org->id,
-                'name'         => $org->name,
-                'slug'         => $org->slug,
-                'subdomain'    => $org->subdomain,
-                'custom_domain'=> $org->custom_domain,
-                'logo'         => $org->logo,
-                'primary_color'=> $org->primary_color,
-                'timezone'     => $org->timezone,
-                'locale'       => $org->locale,
-                'plan'         => $org->plan ? [
-                    'name'                  => $org->plan->name,
-                    'max_students'          => $org->plan->max_students,
-                    'max_courses'           => $org->plan->max_courses,
-                    'max_tracks'            => $org->plan->max_tracks,
-                    'max_storage_gb'        => $org->plan->max_storage_gb,
-                    'max_ai_calls_per_month'=> $org->plan->max_ai_calls_per_month,
-                    'allow_custom_domain'   => $org->plan->allow_custom_domain,
-                    'allow_white_label'     => $org->plan->allow_white_label,
+                'id'            => $org->id,
+                'name'          => $org->name,
+                'slug'          => $org->slug,
+                'subdomain'     => $org->subdomain,
+                'custom_domain' => $org->custom_domain,
+                'logo'          => $org->logo,
+                'primary_color' => $org->primary_color,
+                'timezone'      => $org->timezone,
+                'locale'        => $org->locale,
+                'plan'          => $org->plan ? [
+                    'name'                   => $org->plan->name,
+                    'max_students'           => $org->plan->max_students,
+                    'max_courses'            => $org->plan->max_courses,
+                    'max_tracks'             => $org->plan->max_tracks,
+                    'max_storage_gb'         => $org->plan->max_storage_gb,
+                    'max_ai_calls_per_month' => $org->plan->max_ai_calls_per_month,
+                    'allow_custom_domain'    => $org->plan->allow_custom_domain,
+                    'allow_white_label'      => $org->plan->allow_white_label,
                 ] : null,
-                'subscription' => $org->activeSubscription ? [
-                    'status'              => $org->activeSubscription->status,
-                    'billing_interval'    => $org->activeSubscription->billing_interval,
-                    'current_period_end'  => $org->activeSubscription->current_period_end,
-                    'trial_ends_at'       => $org->activeSubscription->trial_ends_at,
+                'subscription'  => $org->activeSubscription ? [
+                    'status'             => $org->activeSubscription->status,
+                    'billing_interval'   => $org->activeSubscription->billing_interval,
+                    'current_period_end' => $org->activeSubscription->current_period_end,
+                    'trial_ends_at'      => $org->activeSubscription->trial_ends_at,
                 ] : null,
             ],
         ]);
@@ -65,10 +67,10 @@ class OrganizationController extends Controller
 
         $membership = $org->users()
             ->where('user_id', $user->id)
-            ->whereIn('pivot_role', ['owner', 'admin'])
             ->first();
 
-        if (!$membership && !$user->isAdmin()) {
+        if ((!$membership || !in_array($membership->pivot->role, ['owner', 'admin']))
+            && $user->role !== 'admin') {
             return response()->json([
                 'success' => false,
                 'message' => 'Only organization owners and admins can update settings.',
@@ -112,7 +114,10 @@ class OrganizationController extends Controller
                 'joined_at' => $user->pivot->joined_at,
             ]);
 
-        return response()->json(['success' => true, 'data' => $members]);
+        return response()->json([
+            'success' => true,
+            'data'    => $members,
+        ]);
     }
 
     /**
@@ -152,9 +157,9 @@ class OrganizationController extends Controller
             }
         }
 
-        // Find or create user
+        // Find user by email (case-insensitive)
         $invitee = \App\Models\User::whereRaw('LOWER(email) = ?', [
-            strtolower($request->email)
+            strtolower($request->email),
         ])->first();
 
         if (!$invitee) {
@@ -179,8 +184,14 @@ class OrganizationController extends Controller
             'joined_at' => now(),
         ]);
 
+        // Audit log
+        AuditLogService::log('MEMBER_INVITED', 'Organization', $org->id, [
+            'invited_user' => $invitee->id,
+            'role'         => $request->role,
+        ]);
+
         // Notify invitee
-        \App\Services\NotificationService::send(
+        NotificationService::send(
             userId: $invitee->id,
             type:   'org_invite',
             title:  "Invited to {$org->name}",
@@ -208,7 +219,10 @@ class OrganizationController extends Controller
         $user = auth()->user();
 
         // Only owner can change roles
-        $myMembership = $org->users()->where('user_id', $user->id)->first();
+        $myMembership = $org->users()
+            ->where('user_id', $user->id)
+            ->first();
+
         if (!$myMembership || $myMembership->pivot->role !== 'owner') {
             return response()->json([
                 'success' => false,
@@ -224,7 +238,10 @@ class OrganizationController extends Controller
             ], 400);
         }
 
-        $member = $org->users()->where('user_id', $userId)->first();
+        $member = $org->users()
+            ->where('user_id', $userId)
+            ->first();
+
         if (!$member) {
             return response()->json([
                 'success' => false,
@@ -252,7 +269,10 @@ class OrganizationController extends Controller
         $user = auth()->user();
 
         // Only owner/admin can remove
-        $myMembership = $org->users()->where('user_id', $user->id)->first();
+        $myMembership = $org->users()
+            ->where('user_id', $user->id)
+            ->first();
+
         if (!$myMembership || !in_array($myMembership->pivot->role, ['owner', 'admin'])) {
             return response()->json([
                 'success' => false,
@@ -267,6 +287,11 @@ class OrganizationController extends Controller
                 'message' => 'Cannot remove the organization owner.',
             ], 400);
         }
+
+        // Audit log before detach
+        AuditLogService::log('MEMBER_REMOVED', 'Organization', $org->id, [
+            'removed_user' => $userId,
+        ]);
 
         $org->users()->detach($userId);
 
@@ -286,13 +311,13 @@ class OrganizationController extends Controller
         $plan = $org->plan;
 
         $usage = [
-            'students'          => $org->users()->wherePivot('role', 'student')->count(),
-            'instructors'       => $org->users()->wherePivot('role', 'instructor')->count(),
-            'courses'           => \App\Models\Course::withoutTenantScope()->where('organization_id', $org->id)->count(),
-            'tracks'            => \App\Models\Track::withoutTenantScope()->where('organization_id', $org->id)->count(),
-            'ai_calls_this_month' => \App\Models\AiUsageLog::where('organization_id', $org->id)
-                ->where('used_at', '>=', now()->startOfMonth())
-                ->count(),
+            'students'            => $org->users()->wherePivot('role', 'student')->count(),
+            'instructors'         => $org->users()->wherePivot('role', 'instructor')->count(),
+            'courses'             => Course::withoutTenantScope()->where('organization_id', $org->id)->count(),
+            'tracks'              => Track::withoutTenantScope()->where('organization_id', $org->id)->count(),
+            'ai_calls_this_month' => AiUsageLog::where('organization_id', $org->id)
+                                        ->where('used_at', '>=', now()->startOfMonth())
+                                        ->count(),
         ];
 
         $limits = $plan ? [
