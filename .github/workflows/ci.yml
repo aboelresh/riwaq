@@ -48,9 +48,9 @@ jobs:
 
       - name: Static Analysis (PHPStan)
         run: |
-          composer require --dev phpstan/phpstan --quiet 2>/dev/null || true
-          vendor/bin/phpstan analyse app --level=3 --no-progress 2>/dev/null || true
-        continue-on-error: true
+          composer require --dev phpstan/phpstan --quiet
+          vendor/bin/phpstan analyse app --level=5 --no-progress
+        continue-on-error: false
 
       - name: Check for debug statements
         run: |

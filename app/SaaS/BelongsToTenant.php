@@ -39,10 +39,6 @@ trait BelongsToTenant
         });
     }
 
-    /**
-     * Escape hatch for system-level queries (admin, jobs, reports).
-     * MUST be used explicitly and intentionally — never in regular Controllers.
-     */
    /**
  * DANGER: Bypasses tenant isolation entirely.
  * ONLY use in:
