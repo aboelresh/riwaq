@@ -43,10 +43,24 @@ trait BelongsToTenant
      * Escape hatch for system-level queries (admin, jobs, reports).
      * MUST be used explicitly and intentionally — never in regular Controllers.
      */
-    public static function withoutTenantScope(): Builder
-    {
-        return static::withoutGlobalScope('tenant');
-    }
+   /**
+ * DANGER: Bypasses tenant isolation entirely.
+ * ONLY use in:
+ * 1. EntitlementService (counting resources across tenant)
+ * 2. System-level admin commands
+ * 3. Reporting/analytics that need cross-tenant data
+ *
+ * NEVER use in:
+ * - Public controllers
+ * - User-facing endpoints
+ * - Any code that accepts user input
+ *
+ * Every use must be reviewed in PR checklist.
+ */
+public static function withoutTenantScope(): Builder
+{
+    return static::withoutGlobalScope('tenant');
+}
 
     public function organization()
     {

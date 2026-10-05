@@ -45,3 +45,13 @@ jobs:
 
       - name: Check Routes
         run: php artisan route:list --path=api/v1 > /dev/null
+
+      - name: Static Analysis (PHPStan)
+        run: |
+          composer require --dev phpstan/phpstan --quiet 2>/dev/null || true
+          vendor/bin/phpstan analyse app --level=3 --no-progress 2>/dev/null || true
+        continue-on-error: true
+
+      - name: Check for debug statements
+        run: |
+          ! grep -r "dd(\|dump(\|var_dump(\|print_r(" app/ --include="*.php" | grep -v "vendor"
