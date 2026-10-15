@@ -75,6 +75,15 @@ jobs:
             exit 1
           fi
           echo "withoutTenantScope usage is within approved files."
+      
+      - name: Validate Production Env (simulation)
+        run: |
+          # Simulate production env to check our validator catches issues
+          APP_ENV=production APP_DEBUG=false \
+          APP_KEY=base64:$(openssl rand -base64 32) \
+          JWT_SECRET=$(openssl rand -base64 32) \
+          php artisan app:validate-production-env
+        continue-on-error: true
 
   # ── Job 2: Migration test on MySQL (compatibility) ─────────────
   test-mysql:

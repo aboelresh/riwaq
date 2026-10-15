@@ -266,3 +266,31 @@ dispatched from `ProgressService`, not from Controllers.
 
 \- Can be disabled per-route if needed (e.g., Swagger UI assets)
 
+---
+
+## 11. MySQL Minimum Requirements
+
+**Decision:** Require MySQL 8.0.28+ (not older).
+
+**Rationale:**
+- `innodb_large_prefix` is enabled by default in MySQL 8.0
+- `ROW_FORMAT=DYNAMIC` is the default, supporting large indexes on utf8mb4 columns
+- slug columns are defined as `varchar(191)` to be safe on all MySQL 8.0+ configurations
+
+**Required MySQL settings (auto-applied in MySQL 8.0.28+):**
+```ini
+innodb_large_prefix = ON
+innodb_file_format = Barracuda
+innodb_file_per_table = ON
+```
+
+## 12. withoutTenantScope() Usage Policy
+
+**Decision:** `withoutTenantScope()` is allowed ONLY in:
+1. `EntitlementService` — counting resources for plan limits
+2. `OrganizationController::usage()` — reporting current org usage
+3. `BelongsToTenant::withoutTenantScope()` — the definition itself
+
+**Enforcement:** CI gate in `.github/workflows/ci.yml` blocks any new usage outside these files unless annotated with `// APPROVED: <reason>`.
+
+**Rationale:** An accidental call to `withoutTenantScope()` in a public controller returns cross-tenant data — one of the worst possible SaaS bugs.
