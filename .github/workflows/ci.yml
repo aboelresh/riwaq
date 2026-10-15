@@ -2,14 +2,15 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, master, develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, master ]
 
 jobs:
-  test:
+  # ── Job 1: Tests on SQLite (fast) ──────────────────────────────
+  test-sqlite:
     runs-on: ubuntu-latest
-    name: Tests (PHP 8.2)
+    name: Tests (SQLite)
 
     steps:
       - name: Checkout
@@ -19,7 +20,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
-          extensions: mbstring, pdo, pdo_sqlite, sqlite3, bcmath, gd, zip
+          extensions: mbstring, pdo, pdo_sqlite, sqlite3, bcmath, gd, zip, redis
           coverage: none
 
       - name: Copy .env
@@ -50,8 +51,124 @@ jobs:
         run: |
           composer require --dev phpstan/phpstan --quiet
           vendor/bin/phpstan analyse app --level=5 --no-progress
-        continue-on-error: false
 
       - name: Check for debug statements
         run: |
-          ! grep -r "dd(\|dump(\|var_dump(\|print_r(" app/ --include="*.php" | grep -v "vendor"
+          if grep -rn "dd(\|dump(\|var_dump(\|print_r(" app/ --include="*.php"; then
+            echo "Debug statements found! Remove before merging."
+            exit 1
+          fi
+          echo "No debug statements found."
+
+      - name: Check for unauthorized withoutTenantScope usage
+        run: |
+          # Allow only in: EntitlementService, OrganizationController (usage), and BelongsToTenant itself
+          VIOLATIONS=$(grep -rn "withoutTenantScope" app/ --include="*.php" \
+            | grep -v "BelongsToTenant.php" \
+            | grep -v "EntitlementService.php" \
+            | grep -v "OrganizationController.php" \
+            | grep -v "// APPROVED:" || true)
+          if [ -n "$VIOLATIONS" ]; then
+            echo "Unauthorized withoutTenantScope() usage found:"
+            echo "$VIOLATIONS"
+            echo "Add '// APPROVED: reason' comment or move to EntitlementService"
+            exit 1
+          fi
+          echo "withoutTenantScope usage is within approved files."
+
+  # ── Job 2: Migration test on MySQL (compatibility) ─────────────
+  test-mysql:
+    runs-on: ubuntu-latest
+    name: Migrations (MySQL 8.0)
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: secret
+          MYSQL_DATABASE: riwaq_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, pdo, pdo_mysql, bcmath, gd, zip
+          coverage: none
+
+      - name: Copy .env
+        run: cp .env.example .env
+
+      - name: Install Dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Generate App Key
+        run: php artisan key:generate
+
+      - name: Generate JWT Secret
+        run: php artisan jwt:secret --force
+
+      - name: Run Migrations on MySQL
+        run: php artisan migrate --force
+        env:
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: riwaq_test
+          DB_USERNAME: root
+          DB_PASSWORD: secret
+
+      - name: Run Seeders on MySQL
+        run: php artisan db:seed --class=PlansSeeder --force
+        env:
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: riwaq_test
+          DB_USERNAME: root
+          DB_PASSWORD: secret
+
+      - name: Run Tests on MySQL
+        run: php artisan test --stop-on-failure
+        env:
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: riwaq_test
+          DB_USERNAME: root
+          DB_PASSWORD: secret
+          CACHE_STORE: array
+          QUEUE_CONNECTION: sync
+          MAIL_MAILER: array
+
+  # ── Job 3: Dependency Security Audit ───────────────────────────
+  security-audit:
+    runs-on: ubuntu-latest
+    name: Dependency Audit
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring
+
+      - name: Install Dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Run Composer Audit
+        run: composer audit
+        continue-on-error: true  # Don't fail CI on audit warnings — review manually

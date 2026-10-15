@@ -54,7 +54,7 @@ at the database query level via Eloquent Global Scopes, not just middleware.
 |---|---|
 | Language | PHP 8.2 |
 | Framework | Laravel 12 |
-| Database | MySQL 8.4 (production) / SQLite (testing) |
+| Database | MySQL 8.0.28+ (production) / SQLite (testing) |
 | Cache | Redis |
 | Queue | Redis + Supervisor |
 | Auth | tymon/jwt-auth |

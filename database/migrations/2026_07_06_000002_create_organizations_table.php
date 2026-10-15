@@ -11,9 +11,9 @@ return new class extends Migration
         Schema::create('organizations', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('slug')->unique();
-            $table->string('subdomain')->unique()->nullable();
-            $table->string('custom_domain')->unique()->nullable();
+            $table->string('slug', 191)->unique();       // 191 = max for utf8mb4 on older MySQL
+            $table->string('subdomain', 191)->unique()->nullable();  // unique() already creates index
+            $table->string('custom_domain', 191)->unique()->nullable();
             $table->string('logo')->nullable();
             $table->string('primary_color', 7)->default('#4f46e5');
             $table->string('timezone')->default('UTC');
@@ -25,8 +25,8 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->index('slug');
-            $table->index('subdomain');
+            // Note: slug, subdomain, custom_domain already indexed via ->unique() above
+            // Only add explicit index for non-unique columns
             $table->index('is_active');
         });
     }

@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('plans', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('slug')->unique();
+            $table->string('slug', 191)->unique(); // 191 chars = safe max for utf8mb4
             $table->text('description')->nullable();
             $table->decimal('price_monthly', 10, 2)->default(0);
             $table->decimal('price_yearly', 10, 2)->default(0);
